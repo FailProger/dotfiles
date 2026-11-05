@@ -1,0 +1,20 @@
+# --- XORG CONFIGURE ---
+# Keyboard
+xset r rate 200 45 &
+setxkbmap -layout 'us,ru' -variant ',typo' -option 'grp:toggle,lv3:caps_switch' &
+
+# Session auto lock
+xss-lock --transfer-sleep-lock -- i3lock --nofork &
+
+# --- VISUAL ---
+# Visual compouser
+picom -b &
+
+# Status bar
+dwmblocks &
+
+# Wallpaper
+~/.fehbg &
+
+# --- START GUI ---
+exec dwm

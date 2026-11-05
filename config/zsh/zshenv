@@ -1,0 +1,5 @@
+# Disable default global compinit
+skip_global_compinit=1
+
+# ZSH config directory
+export ZDOTDIR="$HOME"

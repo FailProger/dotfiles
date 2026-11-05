@@ -1,0 +1,30 @@
+[general]
+import = [ "~/.config/alacritty/theme.toml" ]
+live_config_reload = true
+
+[window]
+title = "Terminal"
+
+[font]
+normal.family = "Hack Nerd Font"
+size = 9.0
+normal.style = "Regular"
+bold.style = "Bold"
+italic.style = "Italic"
+bold_italic.style = "Bold Italic"
+
+[selection]
+save_to_clipboard = true
+
+[cursor]
+style.shape = "Beam"
+vi_mode_style.shape = "Block"
+
+[keyboard]
+bindings = [
+  { key = "V", mods = "Control", action = "ToggleViMode" },
+  { key = "H", mods = "Alt", chars = "\u001B[D" },
+  { key = "J", mods = "Alt", chars = "\u001B[B" },
+  { key = "K", mods = "Alt", chars = "\u001B[A" },
+  { key = "L", mods = "Alt", chars = "\u001B[C" },
+]
