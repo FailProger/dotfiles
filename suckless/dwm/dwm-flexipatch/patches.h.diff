@@ -36,7 +36,7 @@
  
  /* Supplementary patch should you want to disable alpha for the status2d section */
  #define BAR_STATUS2D_NO_ALPHA_PATCH 0
-@@ -175,11 +175,14 @@
+@@ -175,13 +175,13 @@
  /* The systray patch adds systray for the status bar.
   * https://dwm.suckless.org/patches/systray/
   */
@@ -46,13 +46,13 @@
  /* Show tag symbols in the bar. */
  #define BAR_TAGS_PATCH 1
  
-+/* Show square indicator in left top of tag*/
+ /* Show square indicator in left top of tag*/
+-#define BAR_TAG_INDICATOR_PATCH 1
 +#define BAR_TAG_INDICATOR_PATCH 0
-+
+ 
  /* Show tag symbols + class of master window in the bar.
   * https://dwm.suckless.org/patches/taglabels/
-  */
-@@ -188,7 +191,7 @@
+@@ -191,7 +191,7 @@
  /* This patch underlines the selected tag, or optionally all tags.
   * https://dwm.suckless.org/patches/underlinetags/
   */
@@ -61,7 +61,7 @@
  
  /* This patch adds the window icon next to the window title in the bar.
   *
-@@ -206,7 +209,7 @@
+@@ -209,7 +209,7 @@
   * https://github.com/AdamYuan/dwm-winicon
   * https://dwm.suckless.org/patches/winicon
   */
@@ -70,7 +70,7 @@
  
  /* Addon for the winicon patch - do not display window title if icon exists */
  #define BAR_WINICON_NOTITLE_PATCH 0
-@@ -260,7 +263,7 @@
+@@ -263,7 +263,7 @@
   * when including this patch.
   * https://dwm.suckless.org/patches/alpha/
   */
@@ -79,7 +79,7 @@
  
  /* This patch introduces alternative tags which can be switched on the fly for the
   * sole purpose of providing visual aid.
-@@ -307,7 +310,7 @@
+@@ -310,7 +310,7 @@
   * modules.
   * https://dwm.suckless.org/patches/centeredwindowname/
   */
@@ -88,7 +88,7 @@
  
  /* Draws a dot indicator overlayed on each tag icon for each client. The selected client
   * is drawn as a larger horizontal line.
-@@ -348,12 +351,12 @@
+@@ -351,12 +351,12 @@
  /* Allows the bar height to be explicitly set rather than being derived from font.
   * https://dwm.suckless.org/patches/bar_height/
   */
@@ -103,7 +103,7 @@
  
  /* With this patch dwm's built-in status bar is only shown when HOLDKEY is pressed
   * and the bar will now overlay the display.
-@@ -384,7 +387,7 @@
+@@ -387,7 +387,7 @@
   * toggled in unison when vanitygaps are toggled. Increasing or decreasing gaps during runtime
   * will not affect the bar padding.
   */
@@ -112,7 +112,7 @@
  
  /* Smart bar padding patch that automatically adjusts the padding when there is
   * only one client on the monitor. Works well with vanitygaps and barpadding
-@@ -455,7 +458,7 @@
+@@ -458,7 +458,7 @@
   * explicitly enabled.
   * https://github.com/bakkeby/patches/blob/master/dwm/dwm-barmodules-wintitleactions-6.2.diff
   */
@@ -121,7 +121,7 @@
  
  /***
   * Other patches
-@@ -471,7 +474,7 @@
+@@ -474,7 +474,7 @@
   * This patch interferes with the center transient windows patches.
   * https://dwm.suckless.org/patches/alwayscenter/
   */
@@ -130,7 +130,7 @@
  
  /* Allows for floating windows to be toggled to be always on top (aot).
   *
-@@ -536,7 +539,7 @@
+@@ -539,7 +539,7 @@
   *
   * https://github.com/bakkeby/patches/wiki/banish
   */
@@ -139,7 +139,7 @@
  
  /* This patch adds proper support for Right-To-Left languages. (such as Farsi, Arabic or Hebrew).
   *
-@@ -737,7 +740,7 @@
+@@ -740,7 +740,7 @@
  /* Switch focus only by mouse click and not sloppy (focus follows mouse pointer).
   * https://dwm.suckless.org/patches/focusonclick/
   */
@@ -148,7 +148,16 @@
  
  /* Selects the next window having the urgent flag regardless of the tag it is on.
   * The urgent flag can be artificially set with the following xdotool command on any window:
-@@ -1431,13 +1437,13 @@
+@@ -926,7 +926,7 @@
+ #define NOBORDER_PATCH 0
+ 
+ /* Add custom border width for floating winodws */
+-#define FLOATING_BORDER_PATCH 0
++#define FLOATING_BORDER_PATCH 1
+ 
+ /* Enable modifying or removing dmenu in config.def.h which resulted previously in a
+  * compilation error because two lines of code hardcode dmenu into dwm.
+@@ -1437,13 +1437,13 @@
   * https://github.com/bakkeby/patches/blob/master/dwm/dwm-vanitygaps-6.2.diff
   * https://github.com/bakkeby/patches/blob/master/dwm/dwm-cfacts-vanitygaps-6.2.diff
   */
@@ -164,7 +173,7 @@
  
  /* By default MOD+Tab will take the user back to the previous tag only. If the user keeps
   * using MOD+Tab then the view will switch back and forth between the current and previous tag.
-@@ -1574,7 +1583,7 @@
+@@ -1580,7 +1580,7 @@
  /* Grid layout where nmaster controls the number of rows.
   * https://dwm.suckless.org/patches/nrowgrid/
   */
@@ -174,7 +183,7 @@
  /* The default tile layout.
   * This can be optionally disabled in favour of other layouts.
 --- a/config.mk
-+++ config.mk
++++ b/config.mk
 @@ -29,7 +29,7 @@
  #KVMLIB = -lkvm
  

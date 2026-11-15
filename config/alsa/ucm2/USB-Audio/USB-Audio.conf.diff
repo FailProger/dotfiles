@@ -1,0 +1,25 @@
+--- a/USB-Audio.conf
++++ b/USB-Audio.conf
+@@ -336,10 +336,22 @@
+ 	True.Define {
+ 		ProfileName "UniversalAudio/Volt2"
+ 	}
+ }
+ 
++If.topping-e2x2-otg {
++	Condition {
++		Type String
++		Haystack "${CardComponents}"
++		Needle "USB152a:8756"
++	}
++	True.Define {
++		ProfileName "Topping/E2x2-OTG"
++		MixerRemap yes
++	}
++}
++
+ If.mixremap {
+ 	Condition {
+ 		Type String
+ 		Empty "${var:MixerRemap}"
+ 	}

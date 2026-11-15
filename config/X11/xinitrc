@@ -1,4 +1,7 @@
 # --- XORG CONFIGURE ---
+# Nvidia driver settings
+#nvidia-settings --assign 'CurrentMetaMode=DP-4: <width>x<height>_<hz> @<width>x<height> +0+0'
+
 # Keyboard
 xset r rate 200 45 &
 setxkbmap -layout 'us,ru' -variant ',typo' -option 'grp:toggle,lv3:caps_switch' &

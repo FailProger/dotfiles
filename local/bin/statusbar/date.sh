@@ -5,4 +5,4 @@ format='+%H:%M:%S'
 datetime=$(date "$format")
 
 . "$(dirname "$0")/theme.sh"
-display "󰥔 $datetime "
+display "󰥔 ${datetime} "

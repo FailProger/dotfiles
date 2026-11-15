@@ -1,3 +1,7 @@
+# Umask
+umask 022
+
+# Start X11 for tty1
 if [[ -z "$DISPLAY" ]] && [[ "$(tty)" == '/dev/tty1' ]]; then
   exec startx &> /dev/null
 fi

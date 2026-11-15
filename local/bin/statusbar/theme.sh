@@ -37,5 +37,5 @@ display() {
         *) color=$color8 ;;
     esac
 
-    echo "^c$color^$value^d^"
+    echo "^c${color}^${value}^d^"
 }

@@ -9,4 +9,4 @@ percent_used="$(df --output=pcent "$path" | tail -n 1 | grep -o '[[:digit:]]\+')
 [ "$percent_used" -ge 90 ] && color=9
 
 . "$(dirname "$0")/theme.sh"
-display "  󰋊 ${used}iB" "$color"
+display " 󰋊 ${used}iB" "${color}"

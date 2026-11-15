@@ -35,4 +35,4 @@ else
 fi
 
 . "$(dirname "$0")/theme.sh"
-display "$icon ${volume}%"
+display "${icon} ${volume}%"

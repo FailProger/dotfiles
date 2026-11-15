@@ -51,7 +51,3 @@ alias sjohn='sudo john'
 
 # nmap
 alias snmap='sudo nmap --min-rate 2500 --min-hostgroup 2500'
-
-# --- DEV TOOLS ---
-# Cargo
-# source "$HOME/.cargo/env"
