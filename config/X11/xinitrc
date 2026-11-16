@@ -19,5 +19,9 @@ dwmblocks &
 # Wallpaper
 ~/.fehbg &
 
+# --- AUTO START ---
+# SSH agent
+eval "$(ssh-agent)"
+
 # --- START GUI ---
 exec dwm

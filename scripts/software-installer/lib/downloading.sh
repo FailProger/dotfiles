@@ -7,18 +7,38 @@
 
 lib__wget_download() {
   local url="${1:?'Do not get url!'}"
+  local output_document="${2:-}"
 
   if ! command -v wget > /dev/null 2>&1; then
     lib__apt_install wget
   fi
 
-  for (( i=0; i < "$LIB_DOWNLOAD__ATTEMPTS"; i++ )); do
-    if wget --connect-timeout="$LIB_DOWNLOAD__CONNECT_TIMEOUT" --read-timeout="$LIB_DOWNLOAD__READ_TIMEOUT" -c "$url"; then
-      return 0
-    fi
+  local i
 
-    sleep "$LIB_DOWNLOAD__BETWEEN_TIMEOUT"
-  done
+  if [[ -n "$output_document" ]]; then
+    for (( i=0; i < "$LIB_DOWNLOAD__ATTEMPTS"; i++ )); do
+        if wget \
+          --connect-timeout="$LIB_DOWNLOAD__CONNECT_TIMEOUT" \
+          --read-timeout="$LIB_DOWNLOAD__READ_TIMEOUT" -c "$url" \
+          --output-document="$output_document" \
+          ; then
+          return 0
+        fi
+
+      sleep "$LIB_DOWNLOAD__BETWEEN_TIMEOUT"
+    done
+  else
+    for (( i=0; i < "$LIB_DOWNLOAD__ATTEMPTS"; i++ )); do
+        if wget \
+          --connect-timeout="$LIB_DOWNLOAD__CONNECT_TIMEOUT" \
+          --read-timeout="$LIB_DOWNLOAD__READ_TIMEOUT" -c "$url" \
+          ; then
+          return 0
+        fi
+
+      sleep "$LIB_DOWNLOAD__BETWEEN_TIMEOUT"
+    done
+  fi
 
   return 1
 }
@@ -26,11 +46,15 @@ lib__wget_download() {
 lib__wget_download_github_release() {
   local repo="${1:?'Do not get repo!'}"
   local file_name="${2:?'Do not get file name!'}"
-  local download_url=''
+  local output_document="${3:-}"
+
+  local download_url
 
   if ! command -v wget > /dev/null 2>&1; then
     lib__apt_install wget
   fi
+
+  local i
 
   for (( i=0; i < "$LIB_DOWNLOAD__ATTEMPTS"; i++ )); do
     download_url=$(
@@ -40,7 +64,7 @@ lib__wget_download_github_release() {
     )
 
     if [[ -n "$download_url" ]]; then
-      lib__wget_download "$download_url"
+      lib__wget_download "$download_url" "$output_document"
       return 0
     fi
 

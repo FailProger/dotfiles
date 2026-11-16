@@ -26,7 +26,7 @@ dirsearch__install() {
 
   lib__as_root rm -rf "$ds_dir"
   lib__as_root mkdir -p /opt
-  lib__as_root mv "$workdir/dirsearch-src" "$ds_dir"
+  lib__as_root cp -rf "$workdir/dirsearch-src" "$ds_dir"
 
   rm -rf "$workdir"
 }

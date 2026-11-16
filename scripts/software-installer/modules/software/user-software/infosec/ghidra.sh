@@ -7,21 +7,21 @@ ghidra__get_dependencies() {
 }
 
 ghidra__install() {
-  local extracted_dir
+  local ghidra_dir='/opt/ghidra'
 
   lib__wget_download_github_release 'NationalSecurityAgency/ghidra' 'ghidra_.*_PUBLIC_.*.zip'
 
-  lib__as_root rm -rf /opt/ghidra /opt/ghidra_*
+  lib__as_root rm -rf "$ghidra_dir" /opt/ghidra_*
   lib__as_root mkdir -p /opt
   lib__as_root unzip -o ghidra*.zip -d /opt
 
-  extracted_dir="$(find /opt -maxdepth 1 -type d -name 'ghidra_*' -print -quit)"
+  local extracted_dir="$(find /opt -maxdepth 1 -type d -name 'ghidra_*' -print -quit)"
   if [[ -z "$extracted_dir" ]]; then
     lib__log_error 'Ghidra archive did not contain the expected directory.'
     return 1
   fi
 
-  lib__as_root mv "$extracted_dir" /opt/ghidra
+  lib__as_root mv "$extracted_dir" "$ghidra_dir"
 
   rm -f ghidra*.zip
 }

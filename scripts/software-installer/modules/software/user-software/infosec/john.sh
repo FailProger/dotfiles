@@ -31,7 +31,7 @@ john__install() {
 
   lib__as_root rm -rf "$john_dir"
   lib__as_root mkdir -p /opt
-  lib__as_root mv "$workdir/john/run" "$john_dir"
+  lib__as_root cp -rf "$workdir/john/run" "$john_dir"
 
   rm -rf "$workdir"
 }
