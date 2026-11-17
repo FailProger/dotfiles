@@ -1,8 +1,6 @@
 polybar__get_dependencies() {
-  local deps='
-  fonts
-  '
-  echo "$deps"
+  # Fonts are a runtime choice; install the fonts module separately.
+  return 0
 }
 
 polybar__install() {

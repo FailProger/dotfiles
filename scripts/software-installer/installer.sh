@@ -27,6 +27,7 @@ OPTIONS:
       --configure-only  Run __configure only.
   -f, --force           Re-run selected phases, ignoring saved state.
   -r, --reset           Remove saved state for the selected modules and exit.
+  -m, --mark-installed  Mark selected modules as installed and exit.
       --keep-going      Continue with the remaining modules after a failure.
 
 EXAMPLES:
@@ -37,6 +38,7 @@ EXAMPLES:
   ./installer.sh -n --verbose all
   ./installer.sh --color=never -n all
   ./installer.sh -r zsh
+  ./installer.sh -m git
 
 NOTES:
   Software is installed for the user who runs the script.

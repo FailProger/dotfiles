@@ -1,8 +1,6 @@
 wallpapers__get_dependencies() {
-  local deps='
-  feh
-  '
-  echo "$deps"
+  # feh is a runtime tool for ~/.fehbg; install the feh module separately.
+  return 0
 }
 
 wallpapers__install() {

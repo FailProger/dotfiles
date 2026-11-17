@@ -204,6 +204,7 @@ command_main() {
   local install_only=0
   local configure_only=0
   local list_modules=0
+  local mark_installed=0
   local reset=0
   local -a targets=()
   local -a modules=()
@@ -265,6 +266,10 @@ command_main() {
         reset=1
         shift
         ;;
+      -m|--mark-installed)
+        mark_installed=1
+        shift
+        ;;
       --keep-going)
         INSTALL_KEEP_GOING=1
         shift
@@ -289,6 +294,17 @@ command_main() {
 
   if [[ "$install_only" -eq 1 && "$configure_only" -eq 1 ]]; then
     lib__log_error '--install-only and --configure-only are mutually exclusive.'
+    return 1
+  fi
+
+  if [[ "$mark_installed" -eq 1 && "$reset" -eq 1 ]]; then
+    lib__log_error '--mark-installed and --reset are mutually exclusive.'
+    return 1
+  fi
+
+  if [[ "$mark_installed" -eq 1 ]] \
+    && [[ "$install_only" -eq 1 || "$configure_only" -eq 1 ]]; then
+    lib__log_error '--mark-installed cannot be used with --install-only or --configure-only.'
     return 1
   fi
 
@@ -319,6 +335,21 @@ command_main() {
   if [[ ${#modules[@]} -eq 0 ]]; then
     lib__log_error 'No modules found.'
     return 1
+  fi
+
+  if [[ "$mark_installed" -eq 1 ]]; then
+    if [[ "$dry_run" -eq 1 ]]; then
+      queue_modules "${modules[@]}" || return 1
+      lib__log_info 'Would mark as installed:'
+      for module_file in "${INSTALL_REQUESTED[@]}"; do
+        printf '  - %s\n' "$(basename "$module_file" .sh)"
+      done
+      return 0
+    fi
+
+    orchestrator__mark_installed "${modules[@]}" || return 1
+    lib__log_success "Marked ${#INSTALL_REQUESTED[@]} module(s) as installed."
+    return 0
   fi
 
   orchestrator__plan "${modules[@]}" || return 1

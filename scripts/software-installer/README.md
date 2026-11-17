@@ -17,6 +17,7 @@ after a failure, and run again safely.
 ./installer.sh cli                     # all modules in a category
 ./installer.sh user-software           # all modules in a group
 ./installer.sh all                     # all modules
+./installer.sh -m git                  # mark a module as installed
 ```
 
 `-l` prints modules grouped by folder. You can pass any name from the list
@@ -40,6 +41,7 @@ Main options:
     --configure-only  only __configure
 -f, --force           run phases again, ignore saved state
 -r, --reset           remove saved state for the selected modules and exit
+-m, --mark-installed  mark selected modules as installed and exit
     --keep-going      continue after errors
 ```
 
@@ -60,7 +62,7 @@ script without sudo.
 Global settings are in `config.sh` next to `installer.sh`:
 
 - `SOFTWARE_DIR` — folder with modules;
-- `DOTFILES_DIR` — folder with configs that modules copy;
+- `CONFIG_DIR` — folder with configs that modules copy;
 - `LOCAL_DIR` — folder with local repository data;
 - `UI_COLOR` — color mode: `auto`, `always` or `never`;
 - `LIB_DOWNLOAD__ATTEMPTS`, `LIB_DOWNLOAD__*_TIMEOUT` — download retries and
@@ -70,8 +72,39 @@ Global settings are in `config.sh` next to `installer.sh`:
 You can edit the file or override values for one run:
 
 ```bash
-DOTFILES_DIR=/srv/dotfiles ./installer.sh -n zsh
+CONFIG_DIR=/srv/dotfiles ./installer.sh -n zsh
 ```
+
+## Manual install marks
+
+If a program is already installed outside the installer, mark its module as
+installed. The installer will not run its install phase again:
+
+```bash
+./installer.sh -m git
+./installer.sh -n dwm      # the git module is already done
+```
+
+`-m` writes only `install.done` with the current module fingerprint. It does
+not touch `configure.done`: if you request that module explicitly later, its
+configure phase can still run.
+
+Use `-n -m git` to preview. Use `-r git` to remove the mark. If the module file
+changes, its fingerprint changes and the module will run again; mark it again
+after the change.
+
+## Non-interactive installs
+
+The installer runs apt and dpkg in non-interactive mode. All phases also
+cannot read input: their stdin is `/dev/null`. If a package needs a choice,
+configure it after the installation. For example:
+
+```bash
+sudo dpkg-reconfigure keyboard-configuration
+sudo dpkg-reconfigure wireshark-common
+```
+
+Modules must not ask questions or wait for input.
 
 ## How it works
 
@@ -194,9 +227,13 @@ name__configure() {
 }
 ```
 
-- `__get_dependencies` — apt packages and/or names of other modules;
+- `__get_dependencies` — packages/modules needed to install or build the
+  program, plus a runtime without which the program cannot start;
 - `__install` — install the main program;
 - `__configure` — configuration only.
+
+Modules must not ask questions or read stdin. All phases run with
+`/dev/null` as stdin.
 
 ### 3. Dependencies
 
@@ -221,8 +258,20 @@ Each entry is resolved in this order:
 
 For example, `alacritty` declares `rust`, so `./installer.sh alacritty` first
 installs the `rust` module and then alacritty. The `git` dependency also points
-to the `cli/git` module, not only to the `git` package. The module installs the
-package and applies the config.
+to the `cli/git` module, not only to the `git` package. Module dependencies are
+installed without their config.
+
+`__get_dependencies` is for install/build and for a runtime the tool cannot
+start without. Do not put the desktop environment here. Xorg, fonts, dmenu,
+terminals, panels, compositors, wallpaper and lock tools are separate modules.
+Ask for them explicitly:
+
+```bash
+./installer.sh dwm xorg dmenu fonts
+```
+
+A runtime that the program itself cannot work without (for example Java for
+Ghidra or Perl for enum4linux) may stay in the list.
 
 Rules:
 
@@ -233,6 +282,8 @@ Rules:
 - a module you ask for explicitly always runs all phases for the selected mode;
 - with `--configure-only`, module dependencies are not added;
 - dependency cycles are an error;
+- do not list the runtime desktop environment: Xorg, fonts, dmenu, terminals,
+  panels, compositors, wallpaper and lock tools;
 - do not list the main program (it goes in `__install`);
 - no `sudo`, `apt-get`, downloads or other actions;
 - duplicates are OK: `lib__apt_install` removes them;
@@ -364,7 +415,7 @@ name__configure() {
 }
 ```
 
-Result: `$DOTFILES_DIR/name` is copied to `$HOME/.config/name`.
+Result: `$CONFIG_DIR/name` is copied to `$HOME/.config/name`.
 Old content at the destination is replaced. Nested copies never appear.
 Permissions: `700` for folders, `600` for files. If the source file has an
 executable bit (exec bit), the copy keeps it and gets `700`.
@@ -435,7 +486,7 @@ Do not:
 
 - `SCRIPT_DIR` — project root;
 - `SOFTWARE_DIR` — `modules/software`;
-- `DOTFILES_DIR` — repository `config/` folder;
+- `CONFIG_DIR` — repository `config/` folder;
 - `LOCAL_DIR` — repository `local/` folder;
 - `HOME` — home folder of the current user;
 - `USER` — name of the current user;
@@ -456,6 +507,8 @@ lib__wget_download <url>              # installs wget if needed
 lib__wget_download_github_release <repo> <file regex>
 
 lib__apt_install <packages...|.deb files>
+lib__apt_run <apt-get or dpkg command...>   # always non-interactive
+lib__apt_update                             # apt-get update once per process
 lib__log_info|warn|error|success <text>
 ```
 
@@ -495,10 +548,12 @@ Before adding a module, check:
 - [ ] the file is in `modules/software/<group>/<category>/`;
 - [ ] the file name is unique;
 - [ ] all three functions exist and have the correct prefix;
-- [ ] `__get_dependencies` has no side effects and no main program;
+- [ ] `__get_dependencies` has no side effects, no main program, and no runtime
+      desktop environment;
 - [ ] `__install` is idempotent (safe to run twice);
 - [ ] there is no plain `sudo`;
 - [ ] apt packages use `lib__apt_install`;
+- [ ] the module does not ask questions or read stdin;
 - [ ] temporary files are removed;
 - [ ] configs use `lib__cp_config` or `lib__file_write`;
 - [ ] the installer runs twice in a row without errors.
@@ -523,6 +578,9 @@ bash -n modules/software/user-software/<category>/name.sh
   `__get_dependencies`; break the cycle.
 - **`Failed to get sudo privileges`** — sudo is missing, there is no terminal,
   or the password prompt was cancelled; run `sudo -v` first or set up NOPASSWD.
+- **apt or dpkg asked a question** — the installer runs them non-interactively.
+  If a package needs a choice, use `sudo dpkg-reconfigure <package>` after the
+  installation.
 - **A phase is skipped but you need to reinstall** — use `--force` or `--reset`.
 - **A config did not update** — config changes do not affect the fingerprint;
   use `--force`.

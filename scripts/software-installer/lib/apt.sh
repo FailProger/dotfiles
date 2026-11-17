@@ -4,6 +4,31 @@ lib__apt_is_installed() {
   [[ "$(dpkg-query -W -f='${Status}' "$package" 2> /dev/null)" == 'install ok installed' ]]
 }
 
+# Internal: set after a successful apt-get update in this process.
+LIB_APT__UPDATED=''
+
+# Run apt/dpkg without questions. sudo resets the environment, so the
+# non-interactive settings are passed explicitly to the command.
+lib__apt_run() {
+  lib__as_root env \
+    DEBIAN_FRONTEND=noninteractive \
+    DEBCONF_NONINTERACTIVE_SEEN=true \
+    APT_LISTCHANGES_FRONTEND=none \
+    NEEDRESTART_MODE=a \
+    UCF_FORCE_CONFFOLD=1 \
+    "$@"
+}
+
+# Refresh apt package lists once per process.
+lib__apt_update() {
+  if [[ -n "${LIB_APT__UPDATED:-}" ]]; then
+    return 0
+  fi
+
+  lib__apt_run apt-get update || return 1
+  LIB_APT__UPDATED=1
+}
+
 # Install only missing apt packages. Deduplication happens here, not in the
 # orchestrator, so modules can return overlapping dependency lists.
 lib__apt_install() {
@@ -35,11 +60,13 @@ lib__apt_install() {
   done
 
   if [[ "$need_update" -eq 1 && -z "${LIB_APT__UPDATED:-}" ]]; then
-    lib__as_root apt-get update || return 1
-    LIB_APT__UPDATED=1
+    lib__apt_update || return 1
   fi
 
-  lib__as_root apt-get install -y --no-install-recommends "${missing[@]}"
+  lib__apt_run apt-get install -y --no-install-recommends \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    "${missing[@]}"
 }
 
 # Print apt dependency metadata.

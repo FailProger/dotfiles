@@ -2,7 +2,6 @@ alacritty__get_dependencies() {
   local deps='
   rust
   git
-  fonts
   cmake
   make
   g++

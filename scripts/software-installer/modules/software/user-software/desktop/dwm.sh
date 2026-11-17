@@ -2,10 +2,9 @@ dwm__get_dependencies() {
   # Build requirements from the flexipatch configuration:
   # X11, Xinerama, Xft, Xrender (alpha), Imlib2 (winicon), and xcb-atom
   # plus pkg-config for dwmblocks-async.
+  # The runtime environment (xorg, dmenu, fonts, lock tools) is installed
+  # only when the user asks for it as separate targets.
   local deps='
-  xorg
-  dmenu
-  fonts
   git
   patch
   make
@@ -18,8 +17,6 @@ dwm__get_dependencies() {
   libxrender-dev
   libimlib2-dev
   libxcb-util-dev
-  i3lock
-  xss-lock
   '
   echo "$deps"
 }
@@ -37,7 +34,7 @@ dwm__install() {
     patch -p1 < "$dwm_dir/dwm-flexipatch/my-patches.diff"
     cp patches.def.h patches.h
     patch -p1 < "$dwm_dir/dwm-flexipatch/patches.h.diff"
-    cp "$dwm_dir/dwm-flexipatch/config-laptop.h" config.h
+    cp "$dwm_dir/dwm-flexipatch/config.h" config.h
 
     cd ..
 

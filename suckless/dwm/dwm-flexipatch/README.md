@@ -59,14 +59,4 @@ After patching and finalizing you can copy `config-laptop.h` and make `dwm` with
 ### Desktop theme (`config-desktop.h`)
 Theme with red accent color and with windows paddings and with borders for all widnows.
 
-After patching but before finalizing you need to edit `pathes.h`. Find
-```
-/* Add custom border width for floating winodws */
-#define FLOATING_BORDER_PATCH 1
-```
-and swith to `0`:
-```
-/* Add custom border width for floating winodws */
-#define FLOATING_BORDER_PATCH 0
-```
-After you can finalizing and copy `config-desktop.h` and make `dwm`.
+After patching and finalizing you can copy `config-desktop.h` and make `dwm` without any source edits.

@@ -159,7 +159,9 @@ lib__state_run_phase() {
   CURRENT_STATE_PHASE="$phase"
   trap 'lib__state_interrupt' INT TERM
 
-  if "$@" 2>&1 | tee -a "$log"; then
+  # Phases must not ask questions. /dev/null makes a stray read fail fast
+  # instead of waiting forever for input.
+  if "$@" </dev/null 2>&1 | tee -a "$log"; then
     rc=0
   else
     rc=${PIPESTATUS[0]}

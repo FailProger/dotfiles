@@ -29,8 +29,8 @@ lib__cp_config() {
   local dst="${2:-$HOME/.config/$(basename "$1")}"
   local src
 
-  if [[ -n "${DOTFILES_DIR:-}" ]]; then
-    src="$DOTFILES_DIR/$file"
+  if [[ -n "${CONFIG_DIR:-}" ]]; then
+    src="$CONFIG_DIR/$file"
   else
     src="$file"
   fi

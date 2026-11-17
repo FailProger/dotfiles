@@ -6,8 +6,8 @@ keepassxc__get_dependencies() {
 }
 
 keepassxc__install() {
-  lib__as_root add-apt-repository ppa:phoerious/keepassxc
-  lib__as_root apt update
+  lib__apt_run add-apt-repository -y ppa:phoerious/keepassxc
+  lib__apt_update
   lib__apt_install keepassxc
 }
 

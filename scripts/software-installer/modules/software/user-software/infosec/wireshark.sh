@@ -7,8 +7,8 @@ wireshark__install() {
 }
 
 wireshark__configure() {
-  echo 'wireshark-common wireshark-common/install-setuid boolean true' | lib__as_root debconf-set-selections
-  lib__as_root dpkg-reconfigure -f noninteractive wireshark-common
+  echo 'wireshark-common wireshark-common/install-setuid boolean true' | lib__apt_run debconf-set-selections
+  lib__apt_run dpkg-reconfigure -f noninteractive wireshark-common
 
   lib__as_root usermod -aG wireshark "$USER"
 }

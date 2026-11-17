@@ -29,7 +29,7 @@ nvim__configure() {
     rm -rf "$config_dir/.git" "$config_dir/README.md"
   fi
 
-  cp -r "$DOTFILES_DIR/nvim/." "$config_dir/"
+  cp -r "$CONFIG_DIR/nvim/." "$config_dir/"
 
   find "$config_dir" -type d -exec chmod 700 {} +
   find "$config_dir" -type f ! -perm -u+x -exec chmod 600 {} +

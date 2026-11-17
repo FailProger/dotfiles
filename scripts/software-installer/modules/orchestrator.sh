@@ -187,6 +187,32 @@ orchestrator__plan() {
   collect_modules || return 1
 }
 
+# Mark requested modules as installed. Only the install phase is marked;
+# configure state is left as it is.
+orchestrator__mark_installed() {
+  local module_file
+  local key
+  local dir
+  local fingerprint
+
+  queue_modules "$@" || return 1
+
+  lib__state_init
+  lib__state_lock || return 1
+
+  for module_file in "${INSTALL_REQUESTED[@]}"; do
+    key="$(_module_key "$module_file")"
+    dir="$(lib__state_module_dir "$key")"
+    fingerprint="$(lib__state_fingerprint "$module_file")"
+
+    lib__state_module_init "$key" "$module_file"
+    lib__state_write "$dir/install.done" "$fingerprint"
+    rm -f "$dir/install.failed" "$dir/install.running"
+  done
+
+  lib__state_unlock
+}
+
 orchestrator__deps_enabled() {
   [[ "$INSTALL_MODE" != 'configure' ]]
 }
@@ -573,7 +599,7 @@ orchestrator__run() {
   lib__state_lock || return 1
 
   if orchestrator__deps_enabled && [[ ${#INSTALL_DEPENDENCIES[@]} -gt 0 ]]; then
-    if ! lib__apt_install "${INSTALL_DEPENDENCIES[@]}"; then
+    if ! lib__apt_install "${INSTALL_DEPENDENCIES[@]}" </dev/null; then
       failed=1
       failed_entries+=('deps:apt')
       if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
