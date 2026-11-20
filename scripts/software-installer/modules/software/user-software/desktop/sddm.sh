@@ -1,4 +1,8 @@
-sddm__get_dependencies() {
+sddm__get_build_dependencies() {
+  return 0
+}
+
+sddm__get_runtime_dependencies() {
   return 0
 }
 

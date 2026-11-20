@@ -1,4 +1,12 @@
-opencode__get_dependencies() {
+opencode__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+opencode__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,4 +1,8 @@
-aircrack_ng__get_dependencies() {
+aircrack_ng__get_build_dependencies() {
+  return 0
+}
+
+aircrack_ng__get_runtime_dependencies() {
   return 0
 }
 

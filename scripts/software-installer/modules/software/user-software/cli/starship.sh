@@ -1,4 +1,12 @@
-starship__get_dependencies() {
+starship__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+starship__get_runtime_dependencies() {
   return 0
 }
 

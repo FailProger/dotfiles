@@ -1,10 +1,18 @@
-nmap__get_dependencies() {
+nmap__get_build_dependencies() {
   local deps='
   git
   g++
   make
   libc6-dev
   libssl-dev
+  '
+  echo "$deps"
+}
+
+nmap__get_runtime_dependencies() {
+  local deps='
+  libssl3t64
+  libpcap0.8t64
   '
   echo "$deps"
 }

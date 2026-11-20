@@ -1,4 +1,8 @@
-dmenu__get_dependencies() {
+dmenu__get_build_dependencies() {
+  return 0
+}
+
+dmenu__get_runtime_dependencies() {
   return 0
 }
 

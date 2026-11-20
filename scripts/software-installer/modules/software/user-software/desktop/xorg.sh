@@ -1,4 +1,8 @@
-xorg__get_dependencies() {
+xorg__get_build_dependencies() {
+  return 0
+}
+
+xorg__get_runtime_dependencies() {
   return 0
 }
 

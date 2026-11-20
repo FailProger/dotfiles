@@ -1,4 +1,4 @@
-hydra__get_dependencies() {
+hydra__get_build_dependencies() {
   local deps='
   git
   gcc
@@ -14,6 +14,22 @@ hydra__get_dependencies() {
   firebird-dev
   libmemcached-dev
   libgcrypt20-dev
+  '
+  echo "$deps"
+}
+
+hydra__get_runtime_dependencies() {
+  local deps='
+  libssl3t64
+  libssh-4
+  libidn12
+  libpcre2-8-0
+  libmariadb3
+  libpq5
+  libsvn1
+  libfbclient2
+  libmemcached11t64
+  libgcrypt20
   '
   echo "$deps"
 }

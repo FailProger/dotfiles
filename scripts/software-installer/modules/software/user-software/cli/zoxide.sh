@@ -1,4 +1,12 @@
-zoxide__get_dependencies() {
+zoxide__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+zoxide__get_runtime_dependencies() {
   return 0
 }
 

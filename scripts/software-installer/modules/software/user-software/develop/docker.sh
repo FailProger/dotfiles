@@ -1,9 +1,15 @@
-docker__get_dependencies() {
-  # Needed to add the official Docker repository.
+docker__get_build_dependencies() {
   local deps='
-  ca-certificates
   curl
   gnupg
+  '
+  echo "$deps"
+}
+
+docker__get_runtime_dependencies() {
+  # The Docker repository stays in apt sources, so HTTPS must keep working.
+  local deps='
+  ca-certificates
   '
   echo "$deps"
 }
@@ -73,7 +79,7 @@ docker__install() {
 deb [arch=${arch} signed-by=${keyring}] https://download.docker.com/linux/${repo_distro} ${codename} stable
 EOF
 
-  lib__apt_update
+  lib__apt_update --force
   lib__apt_install \
     docker-ce \
     docker-ce-cli \

@@ -1,12 +1,49 @@
 declare -a INSTALL_QUEUE=()
 declare -a INSTALL_KEYS=()
 declare -a INSTALL_NAMES=()
-declare -a INSTALL_DEPENDENCIES=()
 declare -a INSTALL_REQUESTED=()
 
 declare -A REQUESTED_SET=()
 declare -A _MODULE_VISITED=()
 declare -A _MODULE_VISITING=()
+
+# Per-module dependency declarations. Values are newline-separated lists.
+declare -A MODULE_BUILD_PACKAGES=()
+declare -A MODULE_RUNTIME_PACKAGES=()
+declare -A MODULE_BUILD_MODULES=()
+declare -A MODULE_RUNTIME_MODULES=()
+declare -A MODULE_HAS_REMOVE=()
+declare -A MODULE_REMOVABLE=()
+declare -A MODULE_ROLE=()
+declare -A MODULE_ACTIVE_INSTALL=()
+
+# Dependency sets.
+declare -a INSTALL_BUILD_ALL=()
+declare -a INSTALL_RUNTIME_ALL=()
+declare -a INSTALL_BUILD_FOR_RUN=()
+declare -a INSTALL_RUNTIME_FOR_RUN=()
+declare -a INSTALL_BUILD_ONLY=()
+declare -a INSTALL_BUILD_ONLY_MODULES=()
+
+# apt snapshots used by the manifest and by cleanup decisions.
+declare -a APT_MANUAL_BEFORE=()
+declare -a APT_INSTALLED_BEFORE=()
+declare -a APT_INSTALLED_AFTER=()
+declare -a APT_INSTALLED_BEFORE_CLEANUP=()
+declare -a APT_INSTALLED_AFTER_CLEANUP=()
+declare -a APT_INSTALLED_BY_US=()
+declare -a APT_AUTOREMOVE_PREVIEW=()
+declare -a APT_AUTOREMOVE_REMOVED=()
+declare -A APT_MANUAL_BEFORE_SET=()
+
+# Run outcome.
+declare -a INSTALL_SUCCEEDED=()
+declare -a INSTALL_FAILED=()
+declare -a INSTALL_SKIPPED=()
+declare -a INSTALL_REMOVED=()
+declare -a INSTALL_KEPT_BUILD_ONLY=()
+declare -A _MODULE_FAILED=()
+declare -A _MODULE_SKIPPED=()
 
 # full | install | configure
 INSTALL_MODE='full'
@@ -14,6 +51,8 @@ INSTALL_FORCE=0
 INSTALL_KEEP_GOING=0
 INSTALL_DRY_RUN=0
 INSTALL_VERBOSE=0
+INSTALL_KEEP_BUILD_DEPS=0
+INSTALL_FORCE_CLEAN=0
 
 _find_module_files() {
   local module_name="${1:?'Do not get module name!'}"
@@ -54,6 +93,49 @@ _module_dir_label() {
 
   relative="${relative%.sh}"
   printf '%s\n' "${relative%/*}"
+}
+
+# Split a newline-separated dependency string into unique package/module names.
+_module_deps_from_string() {
+  local value="${1:-}"
+
+  printf '%s\n' "$value" | awk 'NF && !seen[$0]++'
+}
+
+_array_add_unique() {
+  local -n target="$1"
+  shift
+
+  local -A seen=()
+  local value
+
+  for value in "${target[@]}"; do
+    [[ -n "$value" ]] && seen["$value"]=1
+  done
+
+  for value in "$@"; do
+    [[ -n "$value" ]] || continue
+    [[ -n "${seen[$value]:-}" ]] && continue
+    seen["$value"]=1
+    target+=("$value")
+  done
+}
+
+_array_dedupe() {
+  local -n target="$1"
+
+  local -a result=()
+  local -A seen=()
+  local value
+
+  for value in "${target[@]}"; do
+    [[ -n "$value" ]] || continue
+    [[ -n "${seen[$value]:-}" ]] && continue
+    seen["$value"]=1
+    result+=("$value")
+  done
+
+  target=("${result[@]}")
 }
 
 queue_modules() {
@@ -99,15 +181,75 @@ queue_modules() {
   done
 }
 
-# Collect module dependencies recursively. An entry from __get_dependencies
-# that matches a module name is installed as a module; anything else is
-# treated as an apt package.
-_collect_module() {
-  local module_file="${1:?'Do not get module file!'}"
-  local module
+_append_module_package() {
+  local map_name="$1"
+  local module_file="$2"
+  local package="$3"
+
+  if [[ "$map_name" == 'build' ]]; then
+    MODULE_BUILD_PACKAGES["$module_file"]="${MODULE_BUILD_PACKAGES[$module_file]:-}$package"$'\n'
+  else
+    MODULE_RUNTIME_PACKAGES["$module_file"]="${MODULE_RUNTIME_PACKAGES[$module_file]:-}$package"$'\n'
+  fi
+}
+
+_append_module_dependency() {
+  local map_name="$1"
+  local module_file="$2"
+  local dependency_file="$3"
+
+  if [[ "$map_name" == 'build' ]]; then
+    MODULE_BUILD_MODULES["$module_file"]="${MODULE_BUILD_MODULES[$module_file]:-}$dependency_file"$'\n'
+  else
+    MODULE_RUNTIME_MODULES["$module_file"]="${MODULE_RUNTIME_MODULES[$module_file]:-}$dependency_file"$'\n'
+  fi
+}
+
+_collect_dependency_list() {
+  local map_name="$1"
+  local module_file="$2"
+  local raw="$3"
   local dependency
   local dependency_file
   local -a dependency_matches=()
+
+  while IFS= read -r dependency; do
+    dependency="${dependency//[[:space:]]/}"
+    [[ -n "$dependency" ]] || continue
+
+    dependency_file=''
+    mapfile -t dependency_matches < <(_find_module_files "$dependency")
+
+    if [[ ${#dependency_matches[@]} -gt 1 ]]; then
+      lib__log_error "Dependency '$dependency' is ambiguous: ${dependency_matches[*]}"
+      return 1
+    fi
+
+    if [[ ${#dependency_matches[@]} -eq 1 ]]; then
+      if [[ "$INSTALL_MODE" == 'configure' ]]; then
+        continue
+      fi
+
+      dependency_file="$(realpath "${dependency_matches[0]}")"
+      _append_module_dependency "$map_name" "$module_file" "$dependency_file"
+      _collect_module "$dependency_file" || return 1
+    else
+      _append_module_package "$map_name" "$module_file" "$dependency"
+    fi
+  done < <(_module_deps_from_string "$raw")
+}
+
+# Collect module dependencies recursively. An entry from a dependency
+# function that matches a module name is installed as a module; anything else
+# is treated as an apt package.
+_collect_module() {
+  local module_file="${1:?'Do not get module file!'}"
+  local module
+  local build_raw=''
+  local runtime_raw=''
+  local has_build=0
+  local has_runtime=0
+  local has_legacy=0
 
   module_file="$(realpath "$module_file")"
 
@@ -126,38 +268,48 @@ _collect_module() {
   # shellcheck disable=SC1090
   source "$module_file"
 
-  if ! declare -F "${module}__get_dependencies" > /dev/null \
-    || ! declare -F "${module}__install" > /dev/null \
+  if ! declare -F "${module}__install" > /dev/null \
     || ! declare -F "${module}__configure" > /dev/null; then
     lib__log_error "Module '$module' does not implement the module contract."
     return 1
   fi
 
-  while IFS= read -r dependency; do
-    dependency="${dependency//[[:space:]]/}"
-    [[ -n "$dependency" ]] || continue
+  declare -F "${module}__get_build_dependencies" > /dev/null && has_build=1
+  declare -F "${module}__get_runtime_dependencies" > /dev/null && has_runtime=1
+  declare -F "${module}__get_dependencies" > /dev/null && has_legacy=1
+  declare -F "${module}__remove" > /dev/null && MODULE_HAS_REMOVE["$module_file"]=1
 
-    dependency_file=''
-    mapfile -t dependency_matches < <(_find_module_files "$dependency")
+  if [[ "$has_build" -eq 0 && "$has_runtime" -eq 0 && "$has_legacy" -eq 0 ]]; then
+    lib__log_error "Module '$module' does not declare build or runtime dependencies."
+    return 1
+  fi
 
-    if [[ ${#dependency_matches[@]} -gt 1 ]]; then
-      lib__log_error "Dependency '$dependency' is ambiguous: ${dependency_matches[*]}"
+  if [[ "$has_legacy" -eq 0 && ( "$has_build" -eq 0 || "$has_runtime" -eq 0 ) ]]; then
+    lib__log_error "Module '$module' must implement both __get_build_dependencies and __get_runtime_dependencies."
+    return 1
+  fi
+
+  if [[ "$has_legacy" -eq 1 && "$has_build" -eq 0 && "$has_runtime" -eq 0 ]]; then
+    # Deprecated alias: unknown deps are treated as both build and runtime,
+    # so old modules keep working but never lose packages automatically.
+    if ! build_raw="$("${module}__get_dependencies")"; then
+      lib__log_error "Failed to read dependencies of '$module'."
       return 1
     fi
-
-    if [[ ${#dependency_matches[@]} -eq 1 ]]; then
-      # configure-only does not install module dependencies; requested
-      # modules are still collected by the outer loop.
-      if [[ "$INSTALL_MODE" == 'configure' ]]; then
-        continue
-      fi
-
-      dependency_file="${dependency_matches[0]}"
-      _collect_module "$dependency_file" || return 1
-    else
-      INSTALL_DEPENDENCIES+=("$dependency")
+    runtime_raw="$build_raw"
+  else
+    if [[ "$has_build" -eq 1 ]] && ! build_raw="$("${module}__get_build_dependencies")"; then
+      lib__log_error "Failed to read build dependencies of '$module'."
+      return 1
     fi
-  done < <("${module}__get_dependencies")
+    if [[ "$has_runtime" -eq 1 ]] && ! runtime_raw="$("${module}__get_runtime_dependencies")"; then
+      lib__log_error "Failed to read runtime dependencies of '$module'."
+      return 1
+    fi
+  fi
+
+  _collect_dependency_list 'build' "$module_file" "$build_raw" || return 1
+  _collect_dependency_list 'runtime' "$module_file" "$runtime_raw" || return 1
 
   _MODULE_VISITING["$module_file"]=''
   _MODULE_VISITED["$module_file"]=1
@@ -173,7 +325,20 @@ collect_modules() {
   INSTALL_QUEUE=()
   INSTALL_KEYS=()
   INSTALL_NAMES=()
-  INSTALL_DEPENDENCIES=()
+  INSTALL_BUILD_ALL=()
+  INSTALL_RUNTIME_ALL=()
+  INSTALL_BUILD_FOR_RUN=()
+  INSTALL_RUNTIME_FOR_RUN=()
+  INSTALL_BUILD_ONLY=()
+  INSTALL_BUILD_ONLY_MODULES=()
+  MODULE_BUILD_PACKAGES=()
+  MODULE_RUNTIME_PACKAGES=()
+  MODULE_BUILD_MODULES=()
+  MODULE_RUNTIME_MODULES=()
+  MODULE_HAS_REMOVE=()
+  MODULE_REMOVABLE=()
+  MODULE_ROLE=()
+  MODULE_ACTIVE_INSTALL=()
   _MODULE_VISITED=()
   _MODULE_VISITING=()
 
@@ -207,14 +372,256 @@ orchestrator__mark_installed() {
 
     lib__state_module_init "$key" "$module_file"
     lib__state_write "$dir/install.done" "$fingerprint"
+    lib__state_mark_manual "$key"
     rm -f "$dir/install.failed" "$dir/install.running"
   done
 
   lib__state_unlock
 }
 
+_assign_role() {
+  local module_file="$1"
+  local desired="$2"
+  local current="${MODULE_ROLE[$module_file]:-}"
+
+  if [[ "$desired" == 'build' && -z "${MODULE_REMOVABLE[$module_file]:-}" ]]; then
+    desired='runtime'
+  fi
+
+  case "$current" in
+    requested|runtime)
+      return 1
+      ;;
+    build)
+      if [[ "$desired" == 'runtime' ]]; then
+        MODULE_ROLE["$module_file"]='runtime'
+        return 0
+      fi
+      return 1
+      ;;
+    '')
+      MODULE_ROLE["$module_file"]="$desired"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+orchestrator__compute_roles() {
+  local module_file
+  local key
+  local role
+  local dependency
+  local desired
+  local changed=1
+  local -a dependencies=()
+
+  MODULE_ROLE=()
+  MODULE_REMOVABLE=()
+
+  for module_file in "${INSTALL_QUEUE[@]}"; do
+    key="$(_module_key "$module_file")"
+    if [[ -n "${MODULE_HAS_REMOVE[$module_file]:-}" ]] \
+      && ! lib__state_is_manual_marked "$key"; then
+      MODULE_REMOVABLE["$module_file"]=1
+    fi
+  done
+
+  for module_file in "${INSTALL_REQUESTED[@]}"; do
+    MODULE_ROLE["$module_file"]='requested'
+  done
+
+  while [[ "$changed" -eq 1 ]]; do
+    changed=0
+
+    for module_file in "${INSTALL_QUEUE[@]}"; do
+      role="${MODULE_ROLE[$module_file]:-}"
+      [[ -n "$role" ]] || continue
+
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_BUILD_MODULES[$module_file]:-}")
+      for dependency in "${dependencies[@]}"; do
+        if _assign_role "$dependency" 'build'; then
+          changed=1
+        fi
+      done
+
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_RUNTIME_MODULES[$module_file]:-}")
+      for dependency in "${dependencies[@]}"; do
+        if [[ "$role" == 'build' ]]; then
+          desired='build'
+        else
+          desired='runtime'
+        fi
+        if _assign_role "$dependency" "$desired"; then
+          changed=1
+        fi
+      done
+    done
+  done
+
+  # Every collected module should be reachable from a requested module. If
+  # not, keep it and its dependencies instead of removing something unknown.
+  for module_file in "${INSTALL_QUEUE[@]}"; do
+    if [[ -z "${MODULE_ROLE[$module_file]:-}" ]]; then
+      MODULE_ROLE["$module_file"]='runtime'
+      lib__log_warn "Module '$(_module_name "$module_file")' has no dependency role; keeping it."
+    fi
+  done
+}
+
+# A build-only module is needed only when some requested/runtime module that
+# actually installs in this run depends on it. Without this, a second run of
+# an already-installed program would resurrect its build dependencies just
+# because the build-only module state was reset after the previous cleanup.
+orchestrator__compute_active_install_set() {
+  local module_file
+  local key
+  local role
+  local dependency
+  local changed=1
+  local -a dependencies=()
+
+  MODULE_ACTIVE_INSTALL=()
+
+  for module_file in "${INSTALL_QUEUE[@]}"; do
+    role="${MODULE_ROLE[$module_file]:-runtime}"
+    [[ "$role" == 'build' ]] && continue
+
+    key="$(_module_key "$module_file")"
+    if orchestrator__phase_enabled "$module_file" install \
+      && _module_has_pending_install "$key" "$module_file"; then
+      MODULE_ACTIVE_INSTALL["$module_file"]=1
+    fi
+  done
+
+  while [[ "$changed" -eq 1 ]]; do
+    changed=0
+
+    for module_file in "${INSTALL_QUEUE[@]}"; do
+      [[ -n "${MODULE_ACTIVE_INSTALL[$module_file]:-}" ]] || continue
+      role="${MODULE_ROLE[$module_file]:-runtime}"
+
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_BUILD_MODULES[$module_file]:-}")
+      for dependency in "${dependencies[@]}"; do
+        if [[ -z "${MODULE_ACTIVE_INSTALL[$dependency]:-}" ]]; then
+          MODULE_ACTIVE_INSTALL["$dependency"]=1
+          changed=1
+        fi
+      done
+
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_RUNTIME_MODULES[$module_file]:-}")
+      for dependency in "${dependencies[@]}"; do
+        if [[ "$role" != 'build' ]]; then
+          # A runtime dependency that is already installed does not need its
+          # own build dependencies. Only an installing runtime module does.
+          key="$(_module_key "$dependency")"
+          if ! orchestrator__phase_enabled "$dependency" install \
+            || ! _module_has_pending_install "$key" "$dependency"; then
+            continue
+          fi
+        fi
+
+        if [[ -z "${MODULE_ACTIVE_INSTALL[$dependency]:-}" ]]; then
+          MODULE_ACTIVE_INSTALL["$dependency"]=1
+          changed=1
+        fi
+      done
+    done
+  done
+}
+
+orchestrator__compute_all_dependency_sets() {
+  local module_file
+  local role
+  local -a dependencies=()
+
+  INSTALL_BUILD_ALL=()
+  INSTALL_RUNTIME_ALL=()
+
+  for module_file in "${INSTALL_QUEUE[@]}"; do
+    role="${MODULE_ROLE[$module_file]:-runtime}"
+
+    mapfile -t dependencies < <(_module_deps_from_string "${MODULE_BUILD_PACKAGES[$module_file]:-}")
+    _array_add_unique INSTALL_BUILD_ALL "${dependencies[@]}"
+
+    mapfile -t dependencies < <(_module_deps_from_string "${MODULE_RUNTIME_PACKAGES[$module_file]:-}")
+    if [[ "$role" == 'build' ]]; then
+      _array_add_unique INSTALL_BUILD_ALL "${dependencies[@]}"
+    else
+      _array_add_unique INSTALL_RUNTIME_ALL "${dependencies[@]}"
+    fi
+  done
+}
+
+orchestrator__filter_dependency_sets() {
+  local module_file
+  local key
+  local role
+  local -a dependencies=()
+
+  INSTALL_BUILD_FOR_RUN=()
+  INSTALL_RUNTIME_FOR_RUN=()
+  INSTALL_BUILD_ONLY_MODULES=()
+
+  if ! orchestrator__deps_enabled; then
+    return 0
+  fi
+
+  for module_file in "${INSTALL_QUEUE[@]}"; do
+    role="${MODULE_ROLE[$module_file]:-runtime}"
+    key="$(_module_key "$module_file")"
+
+    if [[ "$role" != 'build' ]]; then
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_RUNTIME_PACKAGES[$module_file]:-}")
+      _array_add_unique INSTALL_RUNTIME_FOR_RUN "${dependencies[@]}"
+    fi
+
+    if [[ -n "${MODULE_ACTIVE_INSTALL[$module_file]:-}" ]] \
+      && orchestrator__phase_enabled "$module_file" install \
+      && _module_has_pending_install "$key" "$module_file"; then
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_BUILD_PACKAGES[$module_file]:-}")
+      _array_add_unique INSTALL_BUILD_FOR_RUN "${dependencies[@]}"
+    fi
+
+    if [[ "$role" == 'build' && -n "${MODULE_ACTIVE_INSTALL[$module_file]:-}" ]]; then
+      # Runtime libraries of a build-only tool are needed while it runs,
+      # even if its install phase was completed in an earlier run.
+      mapfile -t dependencies < <(_module_deps_from_string "${MODULE_RUNTIME_PACKAGES[$module_file]:-}")
+      _array_add_unique INSTALL_BUILD_FOR_RUN "${dependencies[@]}"
+      INSTALL_BUILD_ONLY_MODULES+=("$module_file")
+    fi
+  done
+}
+
+orchestrator__prepare_dependency_sets() {
+  lib__cleanup_pending_load
+  orchestrator__compute_roles
+  orchestrator__compute_active_install_set
+  orchestrator__compute_all_dependency_sets
+  orchestrator__filter_dependency_sets
+
+  if [[ "$INSTALL_DRY_RUN" -eq 1 && "$INSTALL_KEEP_BUILD_DEPS" -eq 0 ]]; then
+    orchestrator__apt_snapshot_before
+    orchestrator__compute_build_only
+  fi
+}
+
 orchestrator__deps_enabled() {
   [[ "$INSTALL_MODE" != 'configure' ]]
+}
+
+# Build-only modules that are not needed by an installing module are left
+# alone. They are not part of this run's plan and are not reinstalled.
+orchestrator__module_needed() {
+  local module_file="${1:?'Do not get module file!'}"
+
+  if [[ "${MODULE_ROLE[$module_file]:-runtime}" == 'build' ]] \
+    && [[ -z "${MODULE_ACTIVE_INSTALL[$module_file]:-}" ]]; then
+    return 1
+  fi
+
+  return 0
 }
 
 # A module dependency (not explicitly requested) is installed without
@@ -262,7 +669,9 @@ orchestrator__phase_status() {
   local phase="${2:?'Do not get phase!'}"
   local module_file="${3:?'Do not get module file!'}"
 
-  if ! orchestrator__phase_enabled "$module_file" "$phase"; then
+  if ! orchestrator__module_needed "$module_file"; then
+    printf 'skipped'
+  elif ! orchestrator__phase_enabled "$module_file" "$phase"; then
     printf 'skipped'
   elif [[ "$INSTALL_FORCE" -eq 1 ]]; then
     printf 'pending'
@@ -273,12 +682,19 @@ orchestrator__phase_status() {
   fi
 }
 
+_module_has_pending_install() {
+  local key="${1:?'Do not get module key!'}"
+  local module_file="${2:?'Do not get module file!'}"
+
+  orchestrator__phase_enabled "$module_file" install \
+    && [[ "$(orchestrator__phase_status "$key" install "$module_file")" == 'pending' ]]
+}
+
 _module_has_pending() {
   local key="${1:?'Do not get module key!'}"
   local module_file="${2:?'Do not get module file!'}"
 
-  if orchestrator__phase_enabled "$module_file" install \
-    && [[ "$(orchestrator__phase_status "$key" install "$module_file")" == 'pending' ]]; then
+  if _module_has_pending_install "$key" "$module_file"; then
     return 0
   fi
 
@@ -315,16 +731,16 @@ _pending_phase_list() {
 _status_icon() {
   case "$1" in
     done)
-      printf '%s%s%s' "$UI_GREEN" "$UI_DONE" "$UI_RESET"
+      printf '%s%s%s' "$UI_BOLD$UI_GREEN" "$UI_DONE" "$UI_RESET"
       ;;
     pending)
-      printf '%s%s%s' "$UI_YELLOW" "$UI_TODO" "$UI_RESET"
+      printf '%s%s%s' "$UI_BOLD$UI_YELLOW" "$UI_TODO" "$UI_RESET"
       ;;
     skipped)
       printf '%s%s%s' "$UI_DIM" "$UI_SKIP" "$UI_RESET"
       ;;
     *)
-      printf '%s%s%s' "$UI_RED" "$UI_FAIL" "$UI_RESET"
+      printf '%s%s%s' "$UI_BOLD$UI_RED" "$UI_FAIL" "$UI_RESET"
       ;;
   esac
 }
@@ -360,8 +776,8 @@ orchestrator__print_plan_table() {
     label="${label%.sh}"
 
     if [[ "$rel_dir" != "$current_dir" ]]; then
-      printf '\n  %s%s%s\n' "$UI_CYAN" "$rel_dir" "$UI_RESET"
-      printf '    %-*s  %-8s%s\n' "$label_width" '' 'install' 'configure'
+      printf '\n  %s%s%s\n' "$UI_BOLD$UI_YELLOW" "$rel_dir" "$UI_RESET"
+      printf '    %s%-*s  %-8s%s%s\n' "$UI_DIM" "$label_width" '' 'install' 'configure' "$UI_RESET"
       current_dir="$rel_dir"
     fi
 
@@ -374,6 +790,11 @@ orchestrator__print_plan_table() {
     _status_icon "$(orchestrator__phase_status "$key" install "$module_file")"
     printf '       '
     _status_icon "$(orchestrator__phase_status "$key" configure "$module_file")"
+
+    if [[ -z "${REQUESTED_SET[$module_file]:-}" ]]; then
+      printf ' %s(dependency)%s' "$UI_DIM" "$UI_RESET"
+    fi
+
     printf '\n'
   done
 }
@@ -389,6 +810,7 @@ orchestrator__print_plan() {
   local done_count
   local auto_count=0
   local dep_tag
+  local module_label
   local -a pending_indices=()
   local -a done_indices=()
 
@@ -415,13 +837,28 @@ orchestrator__print_plan() {
     printf '%-9s %syes, saved phase state is ignored%s\n' 'Force' "$UI_YELLOW" "$UI_RESET"
   fi
 
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 ]]; then
+    printf '%-9s %syes, build dependencies and build-only modules are kept%s\n' 'Keep deps' "$UI_YELLOW" "$UI_RESET"
+  fi
+
+  if [[ "$INSTALL_FORCE_CLEAN" -eq 1 ]]; then
+    printf '%-9s %syes, cleanup runs even if modules fail%s\n' 'Force clean' "$UI_YELLOW" "$UI_RESET"
+  fi
+
   if [[ "$INSTALL_DRY_RUN" -eq 1 ]]; then
     printf '%-9s %syes, nothing will be changed%s\n' 'Dry run' "$UI_YELLOW" "$UI_RESET"
   fi
 
+  local not_needed_count=0
+
   for index in "${!INSTALL_QUEUE[@]}"; do
     key="${INSTALL_KEYS[$index]}"
     module_file="${INSTALL_QUEUE[$index]}"
+
+    if ! orchestrator__module_needed "$module_file"; then
+      not_needed_count=$((not_needed_count + 1))
+      continue
+    fi
 
     if _module_has_pending "$key" "$module_file"; then
       pending_indices+=("$index")
@@ -442,8 +879,13 @@ orchestrator__print_plan() {
   if ((pending_count > 0)); then
     printf ' · %s%s done%s' "$UI_GREEN" "$done_count" "$UI_RESET"
     printf ' · %s%s pending%s' "$UI_YELLOW" "$pending_count" "$UI_RESET"
+  elif ((not_needed_count > 0)); then
+    printf ' · %sall needed done%s' "$UI_GREEN" "$UI_RESET"
   else
     printf ' · %sall done%s' "$UI_GREEN" "$UI_RESET"
+  fi
+  if ((not_needed_count > 0)); then
+    printf ' · %s%s not needed%s' "$UI_DIM" "$not_needed_count" "$UI_RESET"
   fi
   printf '\n'
 
@@ -484,9 +926,45 @@ orchestrator__print_plan() {
     fi
   fi
 
+  if (( ${#INSTALL_BUILD_ONLY_MODULES[@]} > 0 )); then
+    if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 ]]; then
+      printf '\n  %sBuild-only modules kept (--keep-build-deps) (%s)%s\n' \
+        "$UI_BOLD$UI_CYAN" "${#INSTALL_BUILD_ONLY_MODULES[@]}" "$UI_RESET"
+    else
+      printf '\n  %sBuild-only modules for cleanup after a successful run (%s)%s\n' \
+        "$UI_BOLD$UI_CYAN" "${#INSTALL_BUILD_ONLY_MODULES[@]}" "$UI_RESET"
+    fi
+
+    for module_file in "${INSTALL_BUILD_ONLY_MODULES[@]}"; do
+      module_label="$(_module_display_name "$module_file")"
+      if [[ -n "${MODULE_REMOVABLE[$module_file]:-}" ]]; then
+        printf '    %s%s %s%s\n' "$UI_DIM" "$UI_ARROW" "$module_label" "$UI_RESET"
+      else
+        printf '    %s%s %s (kept: no __remove)%s\n' "$UI_DIM" "$UI_ARROW" "$module_label" "$UI_RESET"
+      fi
+    done
+  fi
+
+  if (( ${#CLEANUP_PENDING_PACKAGES[@]} > 0 || ${#CLEANUP_PENDING_MODULES[@]} > 0 )); then
+    printf '\n  %sPending cleanup from a previous run:%s %s package(s), %s module(s)\n' \
+      "$UI_BOLD$UI_YELLOW" "$UI_RESET" \
+      "${#CLEANUP_PENDING_PACKAGES[@]}" "${#CLEANUP_PENDING_MODULES[@]}"
+  fi
+
   printf '\n'
   if orchestrator__deps_enabled; then
-    lib__apt_print_dependencies "$INSTALL_VERBOSE" "${INSTALL_DEPENDENCIES[@]}"
+    if ! lib__apt_lists_present \
+      && [[ ${#INSTALL_BUILD_FOR_RUN[@]} -gt 0 || ${#INSTALL_RUNTIME_FOR_RUN[@]} -gt 0 ]]; then
+      lib__log_warn 'apt package lists are empty; dependency versions are unknown until apt-get update runs.'
+    fi
+
+    lib__apt_print_dependencies 'Build dependencies' "$INSTALL_VERBOSE" "${INSTALL_BUILD_FOR_RUN[@]}"
+    lib__apt_print_dependencies 'Runtime dependencies' "$INSTALL_VERBOSE" "${INSTALL_RUNTIME_FOR_RUN[@]}"
+
+    if [[ "$INSTALL_DRY_RUN" -eq 1 && ${#INSTALL_BUILD_ONLY[@]} -gt 0 ]]; then
+      printf '  %sBuild-only packages for autoremove:%s %s\n' \
+        "$UI_BOLD" "$UI_RESET" "${#INSTALL_BUILD_ONLY[@]}"
+    fi
   else
     printf '  %sDependencies:%s %sskipped (configure-only)%s\n' \
       "$UI_BOLD" "$UI_RESET" "$UI_DIM" "$UI_RESET"
@@ -516,24 +994,160 @@ orchestrator__should_skip() {
   lib__state_phase_done "$key" "$phase" "$module_file"
 }
 
-# Return 0 when at least one selected phase or dependency still needs work.
+orchestrator__apt_snapshot_before() {
+  local package
+
+  mapfile -t APT_MANUAL_BEFORE < <(lib__apt_show_manual)
+  mapfile -t APT_INSTALLED_BEFORE < <(lib__apt_installed_list)
+
+  APT_MANUAL_BEFORE_SET=()
+  for package in "${APT_MANUAL_BEFORE[@]}"; do
+    APT_MANUAL_BEFORE_SET["$package"]=1
+  done
+
+  if [[ -n "${MANIFEST_DIR:-}" ]]; then
+    printf '%s\n' "${APT_INSTALLED_BEFORE[@]}" > "$MANIFEST_DIR/installed_before.txt"
+  fi
+}
+
+orchestrator__apt_snapshot_after() {
+  local before_file
+  local after_file
+
+  mapfile -t APT_INSTALLED_AFTER < <(lib__apt_installed_list)
+
+  if [[ -z "${MANIFEST_DIR:-}" ]]; then
+    return 0
+  fi
+
+  before_file="$MANIFEST_DIR/installed_before.txt"
+  after_file="$MANIFEST_DIR/installed_after.txt"
+  printf '%s\n' "${APT_INSTALLED_AFTER[@]}" > "$after_file"
+
+  mapfile -t APT_INSTALLED_BY_US < <(
+    comm -13 \
+      <(LC_ALL=C sort -u "$before_file") \
+      <(LC_ALL=C sort -u "$after_file")
+  )
+}
+
+orchestrator__apt_snapshot_cleanup_before() {
+  mapfile -t APT_INSTALLED_BEFORE_CLEANUP < <(lib__apt_installed_list)
+
+  if [[ -n "${MANIFEST_DIR:-}" ]]; then
+    printf '%s\n' "${APT_INSTALLED_BEFORE_CLEANUP[@]}" \
+      > "$MANIFEST_DIR/installed_before_cleanup.txt"
+  fi
+}
+
+orchestrator__apt_snapshot_cleanup_after() {
+  local before_file
+  local after_file
+
+  mapfile -t APT_INSTALLED_AFTER_CLEANUP < <(lib__apt_installed_list)
+
+  if [[ -z "${MANIFEST_DIR:-}" ]]; then
+    return 0
+  fi
+
+  before_file="$MANIFEST_DIR/installed_before_cleanup.txt"
+  after_file="$MANIFEST_DIR/installed_after_cleanup.txt"
+  printf '%s\n' "${APT_INSTALLED_AFTER_CLEANUP[@]}" > "$after_file"
+
+  mapfile -t APT_AUTOREMOVE_REMOVED < <(
+    comm -23 \
+      <(LC_ALL=C sort -u "$before_file") \
+      <(LC_ALL=C sort -u "$after_file")
+  )
+}
+
+orchestrator__compute_build_only() {
+  local package
+  local -A runtime_set=()
+
+  INSTALL_BUILD_ONLY=()
+
+  for package in "${INSTALL_RUNTIME_FOR_RUN[@]}"; do
+    runtime_set["$package"]=1
+  done
+
+  for package in "${INSTALL_BUILD_FOR_RUN[@]}"; do
+    [[ -n "${runtime_set[$package]:-}" ]] && continue
+    [[ -n "${APT_MANUAL_BEFORE_SET[$package]:-}" ]] && continue
+    INSTALL_BUILD_ONLY+=("$package")
+  done
+
+  # Pending packages were installed by an earlier run. They stay cleanup
+  # candidates even if apt now reports them as manual, which is exactly the
+  # crash-between-install-and-mark-auto recovery path.
+  for package in "${CLEANUP_PENDING_PACKAGES[@]}"; do
+    [[ -n "${runtime_set[$package]:-}" ]] && continue
+    INSTALL_BUILD_ONLY+=("$package")
+  done
+
+  _array_dedupe INSTALL_BUILD_ONLY
+}
+
+orchestrator__cleanup_pending_prepare() {
+  local module_file
+  local relative
+
+  for module_file in "${INSTALL_BUILD_ONLY[@]}"; do
+    lib__cleanup_pending_track_package "$module_file"
+  done
+
+  for module_file in "${INSTALL_BUILD_ONLY_MODULES[@]}"; do
+    relative="${module_file#"$SOFTWARE_DIR"/}"
+    lib__cleanup_pending_track_module "$relative"
+  done
+
+  lib__cleanup_pending_write
+}
+
 orchestrator__has_pending_work() {
   local index
   local key
   local module_file
-  local dependency
+  local package
+  local lists_present=0
+
+  if lib__apt_lists_present; then
+    lists_present=1
+  fi
 
   if orchestrator__deps_enabled; then
-    for dependency in "${INSTALL_DEPENDENCIES[@]}"; do
-      if ! lib__apt_is_installed "$dependency"; then
+    for package in "${INSTALL_RUNTIME_FOR_RUN[@]}"; do
+      lib__apt_is_installed "$package" && continue
+      if [[ "$lists_present" -eq 0 ]] || lib__apt_available "$package"; then
+        return 0
+      fi
+    done
+
+    for package in "${INSTALL_BUILD_FOR_RUN[@]}"; do
+      lib__apt_is_installed "$package" && continue
+      if [[ "$lists_present" -eq 0 ]] || lib__apt_available "$package"; then
         return 0
       fi
     done
   fi
 
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 0 ]]; then
+    if [[ ${#CLEANUP_PENDING_PACKAGES[@]} -gt 0 || ${#CLEANUP_PENDING_MODULES[@]} -gt 0 ]]; then
+      return 0
+    fi
+
+    if [[ ${#INSTALL_BUILD_ONLY_MODULES[@]} -gt 0 ]]; then
+      return 0
+    fi
+  fi
+
   for index in "${!INSTALL_QUEUE[@]}"; do
     module_file="${INSTALL_QUEUE[$index]}"
     key="${INSTALL_KEYS[$index]}"
+
+    if ! orchestrator__module_needed "$module_file"; then
+      continue
+    fi
 
     if orchestrator__phase_enabled "$module_file" install \
       && ! orchestrator__should_skip "$key" install "$module_file"; then
@@ -575,6 +1189,14 @@ orchestrator__print_resume() {
     flags+=(--keep-going)
   fi
 
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 ]]; then
+    flags+=(--keep-build-deps)
+  fi
+
+  if [[ "$INSTALL_FORCE_CLEAN" -eq 1 ]]; then
+    flags+=(--force-clean)
+  fi
+
   echo 'Failed phases:'
   for entry in "${failed_entries[@]}"; do
     printf '  %s%s%s %s (%s)\n' "$UI_RED" "$UI_FAIL" "$UI_RESET" "${entry%%:*}" "${entry##*:}"
@@ -587,33 +1209,292 @@ orchestrator__print_resume() {
   echo
 }
 
+orchestrator__module_blocked() {
+  local module_file="${1:?'Do not get module file!'}"
+  local dependency
+  local -a dependencies=()
+
+  mapfile -t dependencies < <(
+    {
+      printf '%s\n' "${MODULE_BUILD_MODULES[$module_file]:-}"
+      printf '%s\n' "${MODULE_RUNTIME_MODULES[$module_file]:-}"
+    } | awk 'NF && !seen[$0]++'
+  )
+
+  for dependency in "${dependencies[@]}"; do
+    if [[ -n "${_MODULE_FAILED[$dependency]:-}" || -n "${_MODULE_SKIPPED[$dependency]:-}" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+orchestrator__remove_module() {
+  local module_file="${1:?'Do not get module file!'}"
+  local module
+  local key
+  local rc
+
+  module="$(_module_name "$module_file")"
+  key="$(_module_key "$module_file")"
+
+  # shellcheck disable=SC1090
+  if ! source "$module_file"; then
+    lib__log_warn "Cannot load build-only module '$module'; keeping it."
+    INSTALL_KEPT_BUILD_ONLY+=("$module")
+    MANIFEST_MODULES_KEPT+=("$module")
+    return 0
+  fi
+
+  if ! declare -F "${module}__remove" > /dev/null; then
+    lib__log_warn "Build-only module '$module' has no __remove; keeping it."
+    INSTALL_KEPT_BUILD_ONLY+=("$module")
+    MANIFEST_MODULES_KEPT+=("$module")
+    return 0
+  fi
+
+  lib__state_module_init "$key" "$module_file"
+  MODULE_NAME="$module"
+
+  # Call the phase outside any condition context and capture its status.
+  # A condition such as `if ! phase` disables errexit inside the phase, which
+  # would let a module continue after a failed build command.
+  set +e
+  lib__state_run_phase "$key" 'remove' "$module_file" "${module}__remove"
+  rc=$?
+  set -e
+
+  if [[ "$rc" -eq 0 ]]; then
+    if lib__state_was_kept; then
+      INSTALL_KEPT_BUILD_ONLY+=("$module")
+      MANIFEST_MODULES_KEPT+=("$module")
+    else
+      INSTALL_REMOVED+=("$module")
+      MANIFEST_MODULES_REMOVED+=("$module")
+    fi
+
+    lib__state_reset "$key"
+    return 0
+  fi
+
+  lib__log_warn "Failed to remove build-only module '$module'; keeping it."
+  INSTALL_KEPT_BUILD_ONLY+=("$module")
+  MANIFEST_MODULES_KEPT+=("$module")
+  return 1
+}
+
+orchestrator__warn_unexpected_autoremove() {
+  local package
+  local -A allowed=()
+  local -a unexpected=()
+
+  for package in "${INSTALL_BUILD_ONLY[@]}"; do
+    allowed["$package"]=1
+  done
+  for package in "${APT_INSTALLED_BY_US[@]}"; do
+    allowed["$package"]=1
+  done
+  for package in "${CLEANUP_PENDING_PACKAGES[@]}"; do
+    allowed["$package"]=1
+  done
+
+  for package in "${APT_AUTOREMOVE_PREVIEW[@]}"; do
+    if [[ -z "${allowed[$package]:-}" ]]; then
+      unexpected+=("$package")
+    fi
+  done
+
+  if [[ ${#unexpected[@]} -gt 0 ]]; then
+    lib__log_warn "autoremove will also remove packages not installed by this run: ${unexpected[*]}"
+  fi
+}
+
+orchestrator__cleanup() {
+  local module_file
+  local relative
+  local index
+  local cleanup_failed=0
+  local -a module_files=()
+
+  for module_file in "${INSTALL_BUILD_ONLY_MODULES[@]}"; do
+    module_files+=("$module_file")
+  done
+
+  for relative in "${CLEANUP_PENDING_MODULES[@]}"; do
+    module_file="$SOFTWARE_DIR/$relative"
+    if [[ -f "$module_file" ]]; then
+      module_files+=("$module_file")
+    else
+      lib__log_warn "Pending build-only module '$relative' no longer exists; skipping."
+    fi
+  done
+
+  _array_dedupe module_files
+
+  # Remove dependants before their dependencies.
+  for ((index = ${#module_files[@]} - 1; index >= 0; index--)); do
+    module_file="${module_files[$index]}"
+
+    if [[ -n "${REQUESTED_SET[$module_file]:-}" ]]; then
+      continue
+    fi
+
+    case "${MODULE_ROLE[$module_file]:-build}" in
+      requested|runtime)
+        continue
+        ;;
+    esac
+
+    if ! orchestrator__remove_module "$module_file"; then
+      cleanup_failed=1
+    fi
+  done
+
+  if [[ "$cleanup_failed" -ne 0 ]]; then
+    lib__log_warn 'Skipping autoremove because module removal failed; build dependencies are kept for a retry.'
+  elif [[ ${#INSTALL_BUILD_ONLY[@]} -gt 0 || ${#INSTALL_REMOVED[@]} -gt 0 ]]; then
+    orchestrator__apt_snapshot_cleanup_before
+
+    mapfile -t APT_AUTOREMOVE_PREVIEW < <(lib__apt_autoremove_preview)
+    MANIFEST_AUTOREMOVE_PREVIEW=("${APT_AUTOREMOVE_PREVIEW[@]}")
+    orchestrator__warn_unexpected_autoremove
+
+    if lib__apt_autoremove; then
+      MANIFEST_AUTOREMOVE_RAN=1
+      orchestrator__apt_snapshot_cleanup_after
+      MANIFEST_AUTOREMOVE_REMOVED=("${APT_AUTOREMOVE_REMOVED[@]}")
+    else
+      lib__log_error 'Failed to clean build dependencies.'
+      cleanup_failed=1
+    fi
+  fi
+
+  if [[ "$cleanup_failed" -eq 0 ]]; then
+    lib__cleanup_pending_clear
+    MANIFEST_PENDING_CLEANUP_PROCESSED=1
+  fi
+
+  return "$cleanup_failed"
+}
+
 orchestrator__run() {
   local index
   local module_file
   local key
   local module
-  local -a failed_entries=()
+  local module_ok
   local failed=0
+  local cleanup_failed=0
+  local phase_rc=0
+  local -a failed_entries=()
+  local -a dependency_packages=()
 
   lib__state_init
   lib__state_lock || return 1
+  lib__manifest_begin || {
+    lib__state_unlock
+    return 1
+  }
 
-  if orchestrator__deps_enabled && [[ ${#INSTALL_DEPENDENCIES[@]} -gt 0 ]]; then
-    if ! lib__apt_install "${INSTALL_DEPENDENCIES[@]}" </dev/null; then
-      failed=1
-      failed_entries+=('deps:apt')
-      if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
+  MANIFEST_KEEP_BUILD_DEPS="$INSTALL_KEEP_BUILD_DEPS"
+  MANIFEST_FORCE_CLEAN="$INSTALL_FORCE_CLEAN"
+
+  for module_file in "${INSTALL_REQUESTED[@]}"; do
+    MANIFEST_MODULES_REQUESTED+=("$(_module_name "$module_file")")
+  done
+
+  MANIFEST_BUILD_ALL=("${INSTALL_BUILD_ALL[@]}")
+  MANIFEST_RUNTIME_ALL=("${INSTALL_RUNTIME_ALL[@]}")
+
+  lib__cleanup_pending_load
+
+  # An explicit install request overrides a previous manual mark.
+  for module_file in "${INSTALL_REQUESTED[@]}"; do
+    if orchestrator__phase_enabled "$module_file" install; then
+      lib__state_clear_manual_mark "$(_module_key "$module_file")"
+    fi
+  done
+
+  orchestrator__apt_snapshot_before
+  MANIFEST_MANUAL_BEFORE=("${APT_MANUAL_BEFORE[@]}")
+
+  # Compute and persist cleanup candidates before apt changes anything. This
+  # closes the crash window between the batch install and apt-mark auto: a
+  # package that is manual afterwards is still listed in cleanup.pending.
+  orchestrator__compute_build_only
+  MANIFEST_BUILD_ONLY=("${INSTALL_BUILD_ONLY[@]}")
+
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 0 ]]; then
+    orchestrator__cleanup_pending_prepare
+  fi
+
+  if orchestrator__deps_enabled; then
+    _array_add_unique dependency_packages "${INSTALL_BUILD_FOR_RUN[@]}"
+    _array_add_unique dependency_packages "${INSTALL_RUNTIME_FOR_RUN[@]}"
+
+    if [[ ${#dependency_packages[@]} -gt 0 ]]; then
+      if ! lib__apt_install_batch "${dependency_packages[@]}" </dev/null; then
+        MANIFEST_STATUS='failed'
+        MANIFEST_MODULES_FAILED+=('dependencies:apt')
+        INSTALL_FAILED+=('dependencies:apt')
+        lib__log_error 'Dependency installation failed.'
+        orchestrator__apt_snapshot_after
+        MANIFEST_INSTALLED_BY_US=("${APT_INSTALLED_BY_US[@]}")
         lib__state_unlock
-        orchestrator__print_resume "${failed_entries[@]}"
+        orchestrator__print_resume 'dependencies:apt'
         return 1
       fi
     fi
+  fi
+
+  # Runtime dependencies must be manual even if they were already present as
+  # auto. This is the protection against a later autoremove.
+  if orchestrator__deps_enabled && [[ ${#INSTALL_RUNTIME_FOR_RUN[@]} -gt 0 ]]; then
+    if ! lib__apt_mark_manual "${INSTALL_RUNTIME_FOR_RUN[@]}"; then
+      MANIFEST_STATUS='failed'
+      MANIFEST_MODULES_FAILED+=('dependencies:mark-manual')
+      INSTALL_FAILED+=('dependencies:mark-manual')
+      lib__log_error 'Failed to protect runtime dependencies.'
+      orchestrator__apt_snapshot_after
+      MANIFEST_INSTALLED_BY_US=("${APT_INSTALLED_BY_US[@]}")
+      lib__state_unlock
+      return 1
+    fi
+  fi
+
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 0 && ${#INSTALL_BUILD_ONLY[@]} -gt 0 ]]; then
+    if ! lib__apt_mark_auto "${INSTALL_BUILD_ONLY[@]}"; then
+      MANIFEST_STATUS='failed'
+      MANIFEST_MODULES_FAILED+=('dependencies:mark-auto')
+      INSTALL_FAILED+=('dependencies:mark-auto')
+      lib__log_error 'Failed to mark build dependencies as automatically installed.'
+      orchestrator__apt_snapshot_after
+      MANIFEST_INSTALLED_BY_US=("${APT_INSTALLED_BY_US[@]}")
+      lib__state_unlock
+      return 1
+    fi
+
+    MANIFEST_AUTO_MARKED=("${INSTALL_BUILD_ONLY[@]}")
   fi
 
   for index in "${!INSTALL_QUEUE[@]}"; do
     module_file="${INSTALL_QUEUE[$index]}"
     key="${INSTALL_KEYS[$index]}"
     module="${INSTALL_NAMES[$index]}"
+    module_ok=1
+
+    if ! orchestrator__module_needed "$module_file"; then
+      continue
+    fi
+
+    if orchestrator__module_blocked "$module_file"; then
+      INSTALL_SKIPPED+=("$module")
+      MANIFEST_MODULES_SKIPPED+=("$module")
+      _MODULE_SKIPPED["$module_file"]=1
+      lib__log_warn "$key: skipped because a dependency failed."
+      continue
+    fi
 
     # Once sudo credentials are cached (for example after the first phase),
     # keep them fresh from the main process.
@@ -629,37 +1510,82 @@ orchestrator__run() {
     if orchestrator__phase_enabled "$module_file" install; then
       if orchestrator__should_skip "$key" install "$module_file"; then
         lib__log_info "$key: install already done, skipping."
-      elif ! lib__state_run_phase "$key" install "$module_file" "${module}__install"; then
-        failed=1
-        failed_entries+=("$module:install")
-        if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
-          break
+      else
+        set +e
+        lib__state_run_phase "$key" install "$module_file" "${module}__install"
+        phase_rc=$?
+        set -e
+
+        if [[ "$phase_rc" -ne 0 ]]; then
+          failed=1
+          module_ok=0
+          _MODULE_FAILED["$module_file"]=1
+          INSTALL_FAILED+=("$module:install")
+          MANIFEST_MODULES_FAILED+=("$module:install")
+          failed_entries+=("$module:install")
+          if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
+            break
+          fi
+          continue
         fi
-        continue
       fi
     fi
 
     if orchestrator__phase_enabled "$module_file" configure; then
       if orchestrator__should_skip "$key" configure "$module_file"; then
         lib__log_info "$key: configure already done, skipping."
-      elif ! lib__state_run_phase "$key" configure "$module_file" "${module}__configure"; then
-        failed=1
-        failed_entries+=("$module:configure")
-        if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
-          break
+      else
+        set +e
+        lib__state_run_phase "$key" configure "$module_file" "${module}__configure"
+        phase_rc=$?
+        set -e
+
+        if [[ "$phase_rc" -ne 0 ]]; then
+          failed=1
+          module_ok=0
+          INSTALL_FAILED+=("$module:configure")
+          MANIFEST_MODULES_FAILED+=("$module:configure")
+          failed_entries+=("$module:configure")
+          if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
+            break
+          fi
         fi
       fi
     fi
+
+    if [[ "$module_ok" -eq 1 ]]; then
+      INSTALL_SUCCEEDED+=("$module")
+      MANIFEST_MODULES_SUCCEEDED+=("$module")
+    fi
   done
 
-  lib__state_unlock
+  orchestrator__apt_snapshot_after
+  MANIFEST_INSTALLED_BY_US=("${APT_INSTALLED_BY_US[@]}")
 
-  if [[ "$failed" -eq 0 ]]; then
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 0 ]] \
+    && { [[ "$failed" -eq 0 ]] || [[ "$INSTALL_FORCE_CLEAN" -eq 1 ]]; }; then
+    if ! orchestrator__cleanup; then
+      cleanup_failed=1
+      failed_entries+=('cleanup:build-deps')
+    fi
+  fi
+
+  if [[ "$failed" -eq 0 && "$cleanup_failed" -eq 0 ]]; then
+    MANIFEST_STATUS='success'
+    lib__state_unlock
     lib__log_success 'All selected modules are installed.'
     return 0
   fi
 
-  lib__log_error 'Installation finished with errors.'
+  if [[ "$cleanup_failed" -eq 1 ]]; then
+    MANIFEST_STATUS='cleanup-failed'
+    lib__log_error 'Cleanup finished with errors.'
+  else
+    MANIFEST_STATUS='failed'
+    lib__log_error 'Installation finished with errors.'
+  fi
+
+  lib__state_unlock
   orchestrator__print_resume "${failed_entries[@]}"
   return 1
 }

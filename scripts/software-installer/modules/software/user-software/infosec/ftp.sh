@@ -1,4 +1,8 @@
-ftp__get_dependencies() {
+ftp__get_build_dependencies() {
+  return 0
+}
+
+ftp__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,4 +1,8 @@
-pipewire__get_dependencies() {
+pipewire__get_build_dependencies() {
+  return 0
+}
+
+pipewire__get_runtime_dependencies() {
   return 0
 }
 

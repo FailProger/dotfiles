@@ -1,4 +1,13 @@
-shellfirm__get_dependencies() {
+shellfirm__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  xz-utils
+  '
+  echo "$deps"
+}
+
+shellfirm__get_runtime_dependencies() {
   return 0
 }
 

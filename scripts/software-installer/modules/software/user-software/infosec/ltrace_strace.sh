@@ -1,4 +1,8 @@
-ltrace_strace__get_dependencies() {
+ltrace_strace__get_build_dependencies() {
+  return 0
+}
+
+ltrace_strace__get_runtime_dependencies() {
   return 0
 }
 

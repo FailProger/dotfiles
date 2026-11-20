@@ -1,8 +1,14 @@
-feroxbuster__get_dependencies() {
+feroxbuster__get_build_dependencies() {
   local deps='
+  ca-certificates
+  wget
   unzip
   '
   echo "$deps"
+}
+
+feroxbuster__get_runtime_dependencies() {
+  return 0
 }
 
 feroxbuster__install() {

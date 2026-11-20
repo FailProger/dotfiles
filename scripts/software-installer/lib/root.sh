@@ -51,6 +51,12 @@ lib__start_sudo_keepalive() {
   fi
 
   (
+    # Do not let the long-lived keepalive (and its sleep child) inherit the
+    # state lock descriptor; otherwise a finished run can keep the lock busy.
+    if [[ -n "${STATE_LOCK_FD:-}" ]]; then
+      exec {STATE_LOCK_FD}<&-
+    fi
+
     while true; do
       sudo -n true 2> /dev/null || exit 0
       sleep 60
@@ -62,6 +68,12 @@ lib__start_sudo_keepalive() {
 
 lib__stop_sudo_keepalive() {
   if [[ -n "${SUDO_KEEPALIVE_PID:-}" ]]; then
+    # The keepalive loop may be sleeping; kill its direct child too so no
+    # orphan sleep process survives the run.
+    if command -v pkill > /dev/null 2>&1; then
+      pkill -P "$SUDO_KEEPALIVE_PID" 2> /dev/null || true
+    fi
+
     kill "$SUDO_KEEPALIVE_PID" 2> /dev/null || true
     wait "$SUDO_KEEPALIVE_PID" 2> /dev/null || true
     SUDO_KEEPALIVE_PID=''

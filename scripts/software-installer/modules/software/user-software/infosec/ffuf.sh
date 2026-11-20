@@ -1,4 +1,12 @@
-ffuf__get_dependencies() {
+ffuf__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+ffuf__get_runtime_dependencies() {
   return 0
 }
 

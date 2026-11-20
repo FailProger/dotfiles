@@ -1,5 +1,8 @@
-wallpapers__get_dependencies() {
-  # feh is a runtime tool for ~/.fehbg; install the feh module separately.
+wallpapers__get_build_dependencies() {
+  return 0
+}
+
+wallpapers__get_runtime_dependencies() {
   return 0
 }
 

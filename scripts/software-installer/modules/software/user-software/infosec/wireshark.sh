@@ -1,4 +1,8 @@
-wireshark__get_dependencies() {
+wireshark__get_build_dependencies() {
+  return 0
+}
+
+wireshark__get_runtime_dependencies() {
   return 0
 }
 

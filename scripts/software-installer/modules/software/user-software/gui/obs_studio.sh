@@ -1,4 +1,12 @@
-obs_studio__get_dependencies() {
+obs_studio__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+obs_studio__get_runtime_dependencies() {
   return 0
 }
 

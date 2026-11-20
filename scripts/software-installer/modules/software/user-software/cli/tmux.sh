@@ -1,4 +1,8 @@
-tmux__get_dependencies() {
+tmux__get_build_dependencies() {
+  return 0
+}
+
+tmux__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,4 +1,12 @@
-delta__get_dependencies() {
+delta__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+delta__get_runtime_dependencies() {
   return 0
 }
 

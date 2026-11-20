@@ -1,4 +1,8 @@
-binwalk__get_dependencies() {
+binwalk__get_build_dependencies() {
+  return 0
+}
+
+binwalk__get_runtime_dependencies() {
   return 0
 }
 

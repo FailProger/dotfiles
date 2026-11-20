@@ -1,4 +1,12 @@
-discord__get_dependencies() {
+discord__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+discord__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,7 +1,15 @@
-dirsearch__get_dependencies() {
+dirsearch__get_build_dependencies() {
   local deps='
   git
   python3-venv
+  '
+  echo "$deps"
+}
+
+dirsearch__get_runtime_dependencies() {
+  local deps='
+  python3
+  ca-certificates
   '
   echo "$deps"
 }

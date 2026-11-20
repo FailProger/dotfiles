@@ -1,8 +1,14 @@
-zen_browser__get_dependencies() {
+zen_browser__get_build_dependencies() {
   local deps='
+  ca-certificates
+  wget
   xz-utils
   '
   echo "$deps"
+}
+
+zen_browser__get_runtime_dependencies() {
+  return 0
 }
 
 zen_browser__install() {

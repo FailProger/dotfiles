@@ -1,4 +1,4 @@
-alacritty__get_dependencies() {
+alacritty__get_build_dependencies() {
   local deps='
   rust
   git
@@ -10,6 +10,22 @@ alacritty__get_dependencies() {
   libxcb-xfixes0-dev
   libxkbcommon-dev
   python3
+  '
+  echo "$deps"
+}
+
+alacritty__get_runtime_dependencies() {
+  local deps='
+  libfontconfig1
+  libfreetype6
+  libx11-6
+  libxcb1
+  libxcb-xfixes0
+  libxcb-shape0
+  libxcb-render0
+  libxkbcommon0
+  libxkbcommon-x11-0
+  libwayland-client0
   '
   echo "$deps"
 }

@@ -1,6 +1,14 @@
-ghidra__get_dependencies() {
+ghidra__get_build_dependencies() {
   local deps='
+  ca-certificates
+  wget
   unzip
+  '
+  echo "$deps"
+}
+
+ghidra__get_runtime_dependencies() {
+  local deps='
   openjdk-25-jdk
   '
   echo "$deps"

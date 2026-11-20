@@ -1,4 +1,8 @@
-hashcat__get_dependencies() {
+hashcat__get_build_dependencies() {
+  return 0
+}
+
+hashcat__get_runtime_dependencies() {
   return 0
 }
 

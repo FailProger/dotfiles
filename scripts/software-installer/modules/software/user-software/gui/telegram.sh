@@ -1,4 +1,13 @@
-telegram__get_dependencies() {
+telegram__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  xz-utils
+  '
+  echo "$deps"
+}
+
+telegram__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,4 +1,8 @@
-zsh__get_dependencies() {
+zsh__get_build_dependencies() {
+  return 0
+}
+
+zsh__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,9 +1,4 @@
-dwm__get_dependencies() {
-  # Build requirements from the flexipatch configuration:
-  # X11, Xinerama, Xft, Xrender (alpha), Imlib2 (winicon), and xcb-atom
-  # plus pkg-config for dwmblocks-async.
-  # The runtime environment (xorg, dmenu, fonts, lock tools) is installed
-  # only when the user asks for it as separate targets.
+dwm__get_build_dependencies() {
   local deps='
   git
   patch
@@ -12,11 +7,28 @@ dwm__get_dependencies() {
   pkg-config
   libc6-dev
   libx11-dev
+  libxfixes-dev
+  libxi-dev
   libxinerama-dev
   libxft-dev
   libxrender-dev
   libimlib2-dev
   libxcb-util-dev
+  '
+  echo "$deps"
+}
+
+dwm__get_runtime_dependencies() {
+  local deps='
+  libx11-6
+  libxfixes3
+  libxi6
+  libxinerama1
+  libxft2
+  libxrender1
+  libimlib2t64
+  libxcb1
+  libxcb-util1
   '
   echo "$deps"
 }

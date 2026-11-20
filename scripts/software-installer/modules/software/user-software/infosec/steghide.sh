@@ -1,4 +1,8 @@
-steghide__get_dependencies() {
+steghide__get_build_dependencies() {
+  return 0
+}
+
+steghide__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,6 +1,13 @@
-zinit__get_dependencies() {
+zinit__get_build_dependencies() {
   local deps='
+  ca-certificates
   curl
+  '
+  echo "$deps"
+}
+
+zinit__get_runtime_dependencies() {
+  local deps='
   git
   '
   echo "$deps"

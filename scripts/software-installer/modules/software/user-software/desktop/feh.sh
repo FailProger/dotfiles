@@ -1,5 +1,9 @@
 
-feh__get_dependencies() {
+feh__get_build_dependencies() {
+  return 0
+}
+
+feh__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,9 +1,7 @@
 --- a/USB-Audio.conf
 +++ b/USB-Audio.conf
-@@ -336,10 +336,22 @@
- 	True.Define {
- 		ProfileName "UniversalAudio/Volt2"
- 	}
+@@ -114,6 +114,18 @@
+ 	True.Define.ProfileName "Steinberg/UR44"
  }
  
 +If.topping-e2x2-otg {
@@ -18,8 +16,6 @@
 +	}
 +}
 +
- If.mixremap {
+ If.sony-inzone-h9-h7 {
  	Condition {
  		Type String
- 		Empty "${var:MixerRemap}"
- 	}

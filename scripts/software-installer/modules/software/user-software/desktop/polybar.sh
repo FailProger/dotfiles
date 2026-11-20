@@ -1,5 +1,8 @@
-polybar__get_dependencies() {
-  # Fonts are a runtime choice; install the fonts module separately.
+polybar__get_build_dependencies() {
+  return 0
+}
+
+polybar__get_runtime_dependencies() {
   return 0
 }
 

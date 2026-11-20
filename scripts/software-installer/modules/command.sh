@@ -211,7 +211,33 @@ command_main() {
 
   UI_COLOR_MODE="${UI_COLOR:-auto}"
 
-  trap 'lib__stop_sudo_keepalive; lib__state_unlock' EXIT
+  trap 'rc=$?; lib__manifest_exit || true; lib__stop_sudo_keepalive; lib__state_unlock; exit "$rc"' EXIT
+
+  # Accept bundled short options such as -vn or -yn. Only single-dash
+  # alphabetic bundles are expanded; long options and values stay untouched.
+  local -a argv=()
+  local arg
+  local index
+  local expand_short=1
+
+  for arg in "$@"; do
+    if [[ "$expand_short" -eq 0 ]]; then
+      argv+=("$arg")
+    elif [[ "$arg" == '--' ]]; then
+      expand_short=0
+      argv+=("$arg")
+    elif [[ "$arg" =~ ^-[[:alpha:]]{2,}$ ]]; then
+      for ((index = 1; index < ${#arg}; index++)); do
+        argv+=("-${arg:$index:1}")
+      done
+    else
+      argv+=("$arg")
+    fi
+  done
+
+  if [[ ${#argv[@]} -gt 0 ]]; then
+    set -- "${argv[@]}"
+  fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -274,6 +300,14 @@ command_main() {
         INSTALL_KEEP_GOING=1
         shift
         ;;
+      --keep-build-deps)
+        INSTALL_KEEP_BUILD_DEPS=1
+        shift
+        ;;
+      --force-clean)
+        INSTALL_FORCE_CLEAN=1
+        shift
+        ;;
       --)
         shift
         targets+=("$@")
@@ -305,6 +339,11 @@ command_main() {
   if [[ "$mark_installed" -eq 1 ]] \
     && [[ "$install_only" -eq 1 || "$configure_only" -eq 1 ]]; then
     lib__log_error '--mark-installed cannot be used with --install-only or --configure-only.'
+    return 1
+  fi
+
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 && "$INSTALL_FORCE_CLEAN" -eq 1 ]]; then
+    lib__log_error '--keep-build-deps and --force-clean are mutually exclusive.'
     return 1
   fi
 
@@ -354,6 +393,7 @@ command_main() {
 
   orchestrator__plan "${modules[@]}" || return 1
   lib__state_load
+  orchestrator__prepare_dependency_sets
 
   if [[ "$reset" -eq 1 && "$dry_run" -eq 0 ]]; then
     orchestrator__reset

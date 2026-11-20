@@ -1,8 +1,12 @@
-seclists__get_dependencies() {
+seclists__get_build_dependencies() {
   local deps='
   git
   '
   echo "$deps"
+}
+
+seclists__get_runtime_dependencies() {
+  return 0
 }
 
 seclists__install() {

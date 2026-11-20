@@ -1,4 +1,12 @@
-nvim__get_dependencies() {
+nvim__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+nvim__get_runtime_dependencies() {
   local deps='
   git
   '

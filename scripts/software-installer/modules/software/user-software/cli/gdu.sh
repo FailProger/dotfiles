@@ -1,4 +1,12 @@
-gdu__get_dependencies() {
+gdu__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+gdu__get_runtime_dependencies() {
   return 0
 }
 

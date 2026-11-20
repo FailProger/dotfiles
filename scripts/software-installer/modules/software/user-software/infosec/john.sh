@@ -1,4 +1,4 @@
-john__get_dependencies() {
+john__get_build_dependencies() {
   local deps='
   git
   gcc
@@ -8,6 +8,16 @@ john__get_dependencies() {
   libgmp-dev
   zlib1g-dev
   libbz2-dev
+  '
+  echo "$deps"
+}
+
+john__get_runtime_dependencies() {
+  local deps='
+  libssl3t64
+  libgmp10
+  zlib1g
+  libbz2-1.0
   '
   echo "$deps"
 }

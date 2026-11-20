@@ -58,7 +58,7 @@ lib__ui_init() {
   case "$locale" in
     *UTF-8*|*utf8*|*UTF8*)
       UI_DONE='✓'
-      UI_TODO='·'
+      UI_TODO='○'
       UI_SKIP='–'
       UI_FAIL='✗'
       UI_ARROW='→'

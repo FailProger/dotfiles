@@ -1,6 +1,14 @@
-fonts__get_dependencies() {
+fonts__get_build_dependencies() {
   local deps='
+  ca-certificates
+  wget
   unzip
+  '
+  echo "$deps"
+}
+
+fonts__get_runtime_dependencies() {
+  local deps='
   fontconfig
   '
   echo "$deps"

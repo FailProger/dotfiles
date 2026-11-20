@@ -1,6 +1,8 @@
-i3__get_dependencies() {
-  # i3 itself depends on its runtime libraries. The desktop environment
-  # (xorg, dmenu, fonts, i3lock, xss-lock) is installed only when requested.
+i3__get_build_dependencies() {
+  return 0
+}
+
+i3__get_runtime_dependencies() {
   return 0
 }
 

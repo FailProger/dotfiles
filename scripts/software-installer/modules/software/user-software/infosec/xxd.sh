@@ -1,4 +1,8 @@
-xxd__get_dependencies() {
+xxd__get_build_dependencies() {
+  return 0
+}
+
+xxd__get_runtime_dependencies() {
   return 0
 }
 

@@ -1,4 +1,12 @@
-happ__get_dependencies() {
+happ__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+happ__get_runtime_dependencies() {
   return 0
 }
 

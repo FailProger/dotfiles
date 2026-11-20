@@ -1,4 +1,12 @@
-fzf__get_dependencies() {
+fzf__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+fzf__get_runtime_dependencies() {
   return 0
 }
 

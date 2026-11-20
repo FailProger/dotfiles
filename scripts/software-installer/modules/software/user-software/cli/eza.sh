@@ -1,4 +1,12 @@
-eza__get_dependencies() {
+eza__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+eza__get_runtime_dependencies() {
   return 0
 }
 

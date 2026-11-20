@@ -1,4 +1,8 @@
-exiftool__get_dependencies() {
+exiftool__get_build_dependencies() {
+  return 0
+}
+
+exiftool__get_runtime_dependencies() {
   return 0
 }
 

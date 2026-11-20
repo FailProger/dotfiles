@@ -1,8 +1,14 @@
-metasploit__get_dependencies() {
+metasploit__get_build_dependencies() {
   local deps='
+  ca-certificates
   curl
+  wget
   '
   echo "$deps"
+}
+
+metasploit__get_runtime_dependencies() {
+  return 0
 }
 
 metasploit__install() {

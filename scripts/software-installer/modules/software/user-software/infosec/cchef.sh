@@ -1,4 +1,12 @@
-cchef__get_dependencies() {
+cchef__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+cchef__get_runtime_dependencies() {
   return 0
 }
 

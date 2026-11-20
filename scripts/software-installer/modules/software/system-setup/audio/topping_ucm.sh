@@ -1,8 +1,14 @@
-topping_ucm__get_dependencies() {
+topping_ucm__get_build_dependencies() {
+  local deps='
+  patch
+  '
+  echo "$deps"
+}
+
+topping_ucm__get_runtime_dependencies() {
   local deps='
   alsa-utils
   alsa-ucm-conf
-  patch
   '
   echo "$deps"
 }

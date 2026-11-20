@@ -1,4 +1,12 @@
-wifit3__get_dependencies() {
+wifit3__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+wifit3__get_runtime_dependencies() {
   return 0
 }
 

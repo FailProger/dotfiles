@@ -1,4 +1,8 @@
-cli_utils__get_dependencies() {
+cli_utils__get_build_dependencies() {
+  return 0
+}
+
+cli_utils__get_runtime_dependencies() {
   return 0
 }
 

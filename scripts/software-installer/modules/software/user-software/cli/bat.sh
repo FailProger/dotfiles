@@ -1,4 +1,12 @@
-bat__get_dependencies() {
+bat__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+bat__get_runtime_dependencies() {
   return 0
 }
 

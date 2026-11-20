@@ -1,4 +1,12 @@
-stegseek__get_dependencies() {
+stegseek__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+stegseek__get_runtime_dependencies() {
   return 0
 }
 

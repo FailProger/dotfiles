@@ -32,9 +32,10 @@ lib__mv_to_local_bin() {
         fi
         ;;
       *.tar.xz|*.txz)
-        if ! command -v xz > /dev/null 2>&1; then
-          lib__apt_install xz-utils
-        fi
+        lib__require_command xz xz-utils || {
+          rm -rf "$workdir"
+          return 1
+        }
 
         if ! tar -xJf "$archive" -C "$workdir"; then
           lib__log_error "Failed to extract $archive."
@@ -43,9 +44,10 @@ lib__mv_to_local_bin() {
         fi
         ;;
       *.tar.bz2|*.tbz2)
-        if ! command -v bzip2 > /dev/null 2>&1; then
-          lib__apt_install bzip2
-        fi
+        lib__require_command bzip2 bzip2 || {
+          rm -rf "$workdir"
+          return 1
+        }
 
         if ! tar -xjf "$archive" -C "$workdir"; then
           lib__log_error "Failed to extract $archive."
@@ -54,9 +56,10 @@ lib__mv_to_local_bin() {
         fi
         ;;
       *.zip)
-        if ! command -v unzip > /dev/null 2>&1; then
-          lib__apt_install unzip
-        fi
+        lib__require_command unzip unzip || {
+          rm -rf "$workdir"
+          return 1
+        }
 
         if ! unzip -qo "$archive" -d "$workdir"; then
           lib__log_error "Failed to extract $archive."

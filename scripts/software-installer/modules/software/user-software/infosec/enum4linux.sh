@@ -1,4 +1,12 @@
-enum4linux__get_dependencies() {
+enum4linux__get_build_dependencies() {
+  local deps='
+  ca-certificates
+  wget
+  '
+  echo "$deps"
+}
+
+enum4linux__get_runtime_dependencies() {
   local deps='
   perl
   smbclient
