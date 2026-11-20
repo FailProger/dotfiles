@@ -12,6 +12,12 @@ rust__get_runtime_dependencies() {
   echo "$deps"
 }
 
+# Used by the planner: an existing rustup toolchain is used as is and is not
+# reinstalled or cleaned up as a build-only module.
+rust__is_installed() {
+  [[ -x "$HOME/.cargo/bin/cargo" || -x "$HOME/.cargo/bin/rustup" ]]
+}
+
 rust__install() {
   local had_toolchain=0
 

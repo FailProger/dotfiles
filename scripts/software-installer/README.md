@@ -25,8 +25,9 @@ failure, and run again safely.
 ./installer.sh --keep-build-deps -y dwm  # keep build deps for a later build
 ```
 
-`-l` prints modules grouped by folder. You can pass any name from the list
-to the installer.
+`-l` prints modules grouped by folder with an install status marker:
+`✓` (green) means the install phase is already recorded, `○` (dim) means the
+module is not installed. You can pass any name from the list to the installer.
 
 The first folder under `modules/software` is a group (`user-software`,
 `system-setup`). A folder inside a group is a category (`cli`, `desktop`,
@@ -287,6 +288,9 @@ name__remove() {
   existed before the module was installed. If it decides to keep a pre-existing
   program, it calls `lib__state_mark_kept` so the manifest reports it as kept,
   not removed.
+- `__is_installed` (optional) — return 0 when the module's program is already
+  present. A build-only module with this hook is treated as provided by the
+  user: it is not reinstalled and not scheduled for cleanup.
 
 An old `__get_dependencies` is still accepted as a deprecated alias. Its result
 is treated as both build and runtime, so those dependencies are never removed

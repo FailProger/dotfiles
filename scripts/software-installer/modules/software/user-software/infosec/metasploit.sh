@@ -2,7 +2,7 @@ metasploit__get_build_dependencies() {
   local deps='
   ca-certificates
   curl
-  wget
+  gpg
   '
   echo "$deps"
 }

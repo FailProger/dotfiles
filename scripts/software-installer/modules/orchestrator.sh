@@ -470,6 +470,19 @@ orchestrator__compute_roles() {
   done
 }
 
+# Optional module hook: return 0 when the module's program is already present
+# on the system. A build-only module that the user installed by other means is
+# used as is: it is not reinstalled and not scheduled for cleanup.
+_module_is_present() {
+  local module_file="${1:?'Do not get module file!'}"
+  local module
+
+  module="$(_module_name "$module_file")"
+
+  declare -F "${module}__is_installed" > /dev/null || return 1
+  "${module}__is_installed" > /dev/null 2>&1
+}
+
 # A build-only module is needed only when some requested/runtime module that
 # actually installs in this run depends on it. Without this, a second run of
 # an already-installed program would resurrect its build dependencies just
@@ -504,10 +517,26 @@ orchestrator__compute_active_install_set() {
 
       mapfile -t dependencies < <(_module_deps_from_string "${MODULE_BUILD_MODULES[$module_file]:-}")
       for dependency in "${dependencies[@]}"; do
-        if [[ -z "${MODULE_ACTIVE_INSTALL[$dependency]:-}" ]]; then
-          MODULE_ACTIVE_INSTALL["$dependency"]=1
-          changed=1
+        [[ -z "${MODULE_ACTIVE_INSTALL[$dependency]:-}" ]] || continue
+
+        if ! orchestrator__phase_enabled "$dependency" install; then
+          continue
         fi
+
+        # An already completed build-only module, or one that is present
+        # outside the installer, is used as is. It must not be reinstalled
+        # and later listed for cleanup.
+        key="$(_module_key "$dependency")"
+        if orchestrator__should_skip "$key" install "$dependency"; then
+          continue
+        fi
+
+        if _module_is_present "$dependency"; then
+          continue
+        fi
+
+        MODULE_ACTIVE_INSTALL["$dependency"]=1
+        changed=1
       done
 
       mapfile -t dependencies < <(_module_deps_from_string "${MODULE_RUNTIME_MODULES[$module_file]:-}")

@@ -9,6 +9,11 @@ git__get_runtime_dependencies() {
   echo "$deps"
 }
 
+# Used by the planner: git installed outside the installer is used as is.
+git__is_installed() {
+  lib__apt_is_installed git
+}
+
 git__install() {
   local was_installed=0
 

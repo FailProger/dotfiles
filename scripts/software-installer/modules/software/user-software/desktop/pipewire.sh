@@ -7,7 +7,14 @@ pipewire__get_runtime_dependencies() {
 }
 
 pipewire__install() {
-  lib__apt_install pipewire pipewire-pulse wireplumber
+  local -a packages=(
+    pipewire
+    pipewire-pulse
+    pipewire-jack
+    wireplumber
+  )
+
+  lib__apt_install "${packages[@]}"
 }
 
 pipewire__configure() {

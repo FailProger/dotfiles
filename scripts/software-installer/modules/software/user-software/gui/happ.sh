@@ -7,7 +7,10 @@ happ__get_build_dependencies() {
 }
 
 happ__get_runtime_dependencies() {
-  return 0
+  local deps='
+  libopengl0
+  '
+  echo "$deps"
 }
 
 happ__install() {

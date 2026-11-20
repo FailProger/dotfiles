@@ -26,6 +26,30 @@ command__all_modules() {
   command__all_modules_in_dir "$SOFTWARE_DIR"
 }
 
+# Status shown by --list: "done" once the install phase is recorded for the
+# current module fingerprint (including -m/--mark-installed).
+command__module_status() {
+  local module_file="${1:?'Do not get module file!'}"
+  local key
+
+  key="$(_module_key "$module_file")"
+
+  if lib__state_phase_done "$key" install "$module_file"; then
+    printf 'done\n'
+    return 0
+  fi
+
+  # The list does not preload modules, so load the file to make the optional
+  # __is_installed hook available. This runs in a command substitution, so the
+  # functions do not leak into the parent shell.
+  # shellcheck disable=SC1090
+  if source "$module_file" 2> /dev/null && _module_is_present "$module_file"; then
+    printf 'done\n'
+  else
+    printf 'pending\n'
+  fi
+}
+
 command__resolve_target() {
   local target="${1:?'Do not get target!'}"
   local dir
@@ -78,6 +102,12 @@ command__list_modules() {
   local idx
   local index
   local first_in_group=1
+  local module_file
+  local status
+  local status_color
+  local status_icon
+
+  lib__state_load
 
   mapfile -t files < <(find "$SOFTWARE_DIR" -type f -name '*.sh' -print | sort)
   total=${#files[@]}
@@ -100,7 +130,7 @@ command__list_modules() {
   printf '%sAvailable modules:%s %s\n' "$UI_BOLD" "$UI_RESET" "$total"
 
   width="$(lib__ui_width)"
-  cell=$((name_width + 2))
+  cell=$((name_width + 4))
 
   for dir in "${dirs[@]}"; do
     rel_dir="${dir#"$SOFTWARE_DIR"/}"
@@ -109,7 +139,7 @@ command__list_modules() {
     [[ "$category" == "$rel_dir" ]] && category="$rel_dir"
 
     if [[ "$top" != "$current_top" ]]; then
-      printf '\n  %s%s%s\n' "$UI_BOLD$UI_CYAN" "$top" "$UI_RESET"
+      printf '\n  %s%s%s\n' "$UI_BOLD$UI_YELLOW" "$top" "$UI_RESET"
       current_top="$top"
       first_in_group=1
     fi
@@ -131,7 +161,7 @@ command__list_modules() {
 
     for ((row = 0; row < rows; row++)); do
       if ((row == 0)); then
-        printf '    %s%-*s%s  ' "$UI_CYAN" "$category_width" "$category" "$UI_RESET"
+        printf '    %s%-*s%s  ' "$UI_BOLD$UI_YELLOW" "$category_width" "$category" "$UI_RESET"
       else
         printf '%*s' $((4 + category_width + 2)) ''
       fi
@@ -140,10 +170,23 @@ command__list_modules() {
         idx=$((row * cols + col))
         ((idx < ${#names[@]})) || continue
 
-        if ((col == cols - 1 || idx == ${#names[@]} - 1)); then
-          printf '%s' "${names[$idx]}"
+        name="${names[$idx]}"
+        module_file="$dir/$name.sh"
+        status="$(command__module_status "$module_file")"
+
+        if [[ "$status" == 'done' ]]; then
+          status_color="$UI_GREEN"
+          status_icon="$UI_DONE"
         else
-          printf '%-*s' "$cell" "${names[$idx]}"
+          status_color="$UI_DIM"
+          status_icon="$UI_TODO"
+        fi
+
+        if ((col == cols - 1 || idx == ${#names[@]} - 1)); then
+          printf '%s %s%s%s' "$name" "$status_color" "$status_icon" "$UI_RESET"
+        else
+          printf '%s %s%s%s%*s' "$name" "$status_color" "$status_icon" "$UI_RESET" \
+            "$((cell - ${#name} - 2))" ''
         fi
       done
 
