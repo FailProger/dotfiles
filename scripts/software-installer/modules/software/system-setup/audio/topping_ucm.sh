@@ -22,12 +22,13 @@ topping_ucm__configure() {
   local conf_dir="$LOCAL_DIR/share/alsa/ucm2/USB-Audio"
   
   lib__as_root mkdir -p "$work_dir"
-  lib__as_root rm -rf "$work_dir/Topping"
 
   (
     cd "$work_dir"
 
-    lib__as_root patch -p1 < "$conf_dir/USB-Audio.conf.diff"
+    lib__as_root rm -rf "$work_dir/Topping"
     lib__as_root cp -r "$conf_dir/Topping" .
+
+    lib__as_root patch -p1 < "$conf_dir/USB-Audio.conf.diff"
   )
 }
