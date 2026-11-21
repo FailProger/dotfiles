@@ -16,7 +16,7 @@ zen_browser__install() {
 
   lib__as_root rm -rf /opt/zen /opt/zen_*
   lib__as_root mkdir -p /opt
-  lib__as_root tar -xJf 'zen.linux-x86_64.tar.xz' -C /opt
+  lib__as_root tar -xJvf 'zen.linux-x86_64.tar.xz' -C /opt
 
   if [[ ! -d /opt/zen ]]; then
     lib__as_root mv /opt/zen* /opt/zen
@@ -26,6 +26,20 @@ zen_browser__install() {
 }
 
 zen_browser__configure() {
+  local config_dir="$CONFIG_DIR/zen/Profiles"
+  local profiles_dir="$HOME/.config/zen/Profiles"
+
+  if [[ -d "$profiles_dir" ]]; then
+    mv "$profiles_dir" "${profiles_dir}.bak"
+  fi
+
+  mkdir -p "$profiles_dir"
+
+  local profile
+  for profile in $(find "$config_dir" -name '*.tar.xz' -exec realpath -- {} +); do
+    tar -xJvf "$profile" -C "$profiles_dir"
+  done
+
   lib__as_root chmod 755 /opt/zen/zen
   lib__as_root ln -sf /opt/zen/zen /usr/local/bin/zen
 
@@ -37,6 +51,23 @@ Comment=Beautifully designed browser
 GenericName=Web Browser
 Keywords=Internet;WWW;Browser;Web;Explorer
 Exec=zen
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Icon=/opt/zen/browser/chrome/icons/default/default128.png
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rss+xml;application/rdf+xml;image/gif;image/jpeg;image/png;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/ftp;x-scheme-handler/chrome;video/webm;application/x-xpinstall;
+StartupNotify=true
+EOF
+
+  lib__file_write "$HOME/.local/share/applications/zen-scalpel.desktop" 644 << EOF
+[Desktop Entry]
+Version=1.0
+Name=Scalpel
+Comment=OSINT designed browser
+GenericName=Web Browser
+Keywords=Internet;WWW;Browser;Web;Explorer
+Exec=zen -P scalpel
 Terminal=false
 X-MultipleArgs=false
 Type=Application
