@@ -16,8 +16,5 @@ starship__install() {
 }
 
 starship__configure() {
-  local config_dir="$HOME/.config/starship"
-
-  mkdir -p "$config_dir"
-  /usr/local/bin/starship preset 'jetpack' -o "$config_dir/starship.toml"
+  lib__cp_config 'starship'
 }

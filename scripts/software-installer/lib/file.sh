@@ -40,6 +40,10 @@ lib__cp_config() {
     return 1
   fi
 
+  if [[ -e "$dst" ]]; then
+    mv "$dst" "${dst}.bak"
+  fi
+
   rm -rf "$dst"
   mkdir -p "$(dirname "$dst")"
   cp -r "$src" "$dst"

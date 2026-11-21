@@ -3,7 +3,10 @@ pipewire__get_build_dependencies() {
 }
 
 pipewire__get_runtime_dependencies() {
-  return 0
+  local deps='
+  rtkit
+  '
+  echo "$deps"
 }
 
 pipewire__install() {
@@ -19,4 +22,6 @@ pipewire__install() {
 
 pipewire__configure() {
   systemctl --user enable --now pipewire pipewire-pulse wireplumber
+  lib__cp_config 'pipewire'
+  lib__as_root usermod -aG pipewire "$USER"
 }

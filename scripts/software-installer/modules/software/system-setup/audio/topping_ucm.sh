@@ -19,7 +19,7 @@ topping_ucm__install() {
 
 topping_ucm__configure() {
   local work_dir='/usr/share/alsa/ucm2/USB-Audio'
-  local conf_dir="$CONFIG_DIR/alsa/ucm2/USB-Audio"
+  local conf_dir="$LOCAL_DIR/share/alsa/ucm2/USB-Audio"
   
   lib__as_root mkdir -p "$work_dir"
   lib__as_root rm -rf "$work_dir/Topping"
