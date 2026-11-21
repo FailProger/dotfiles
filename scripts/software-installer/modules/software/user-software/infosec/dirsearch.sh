@@ -44,7 +44,7 @@ dirsearch__configure() {
   local script_path='/usr/local/bin/dirsearch'
 
   lib__file_write "$script_path" 755 << EOF
-#!/usr/bin/env bash
+#!/bin/sh
 
 # It is a link to start dirsearch with python env.
 $ds_dir/.venv/bin/python $ds_dir/dirsearch.py \$@

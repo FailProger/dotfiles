@@ -51,7 +51,7 @@ john__configure() {
   local script_path='/usr/local/bin/john'
 
   lib__file_write "$script_path" 755 << EOF
-#!/usr/bin/env bash
+#!/bin/sh
 
 # It is a link to origin john the ripper,
 # need to start john with full path.

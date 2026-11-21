@@ -37,5 +37,6 @@ nmap__install() {
 }
 
 nmap__configure() {
-  return 0
+  lib__as_root update-alternatives --install /usr/bin/nc nc /usr/local/bin/ncat 100
+  lib__as_root update-alternatives --install /usr/bin/ping ping /usr/local/bin/nping 100
 }
