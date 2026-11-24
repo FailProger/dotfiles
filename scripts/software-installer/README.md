@@ -23,6 +23,7 @@ failure, and run again safely.
 ./installer.sh all                     # all modules
 ./installer.sh -m git                  # mark a module as installed
 ./installer.sh --keep-build-deps -y dwm  # keep build deps for a later build
+./installer.sh $(cat lists/xorg-dwm-base.list | xargs)  # use lists
 ```
 
 `-l` prints modules grouped by folder with an install status marker:
