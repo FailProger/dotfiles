@@ -5,7 +5,7 @@
 #define CMD(...)   { .v = (const char*[]){ __VA_ARGS__, NULL } }
 
 /* appearance */
-static const unsigned int borderpx         = 2;   /* border pixel of windows */
+static const unsigned int borderpx         = 0;   /* border pixel of windows */
 static const unsigned int floatingborderpx = 2;   /* border pixel of floating windows */
 static const unsigned int snap             = 32;  /* snap pixel */
 static const unsigned int gappih           = 5;   /* horiz inner gap between windows */
@@ -40,51 +40,56 @@ static char grey_color_40[]                = "#bbbbbb"; // fg
 
 static char white_color[]                  = "#eeeeee"; // fg sel
 
-static char color_2[]                      = "#bc5653";
+static char accent_color[]                 = "#b55a71";
+
 static char color_6[]                      = "#aa6292";
 
 #define FG_COLOR grey_color_40
 #define FG_SEL_COLOR white_color
 #define BG_COLOR grey_color_10
-#define BG_SEL_COLOR color_2
+#define BG_SEL_COLOR accent_color
 #define BORDER_COLOR grey_color_20
-#define FL_BORDER_COLOR color_2
+#define FL_BORDER_COLOR accent_color
 #define LT_SYM_COLOR color_6
 
-static const unsigned int baralpha = 0xd0;
-static const unsigned int borderalpha = OPAQUE;
+static const unsigned int a0   = 0x00;
+static const unsigned int a73  = 0xbb;
+
+#define BG_ALPHA a73
+#define BORDER_ALPHA OPAQUE
+
 static const unsigned int alphas[][3] = {
 	/*                       fg      bg        border     */
 	// Default
-	[SchemeNorm]         = { OPAQUE, baralpha, borderalpha },
-	[SchemeSel]          = { OPAQUE, baralpha, borderalpha },
-	[SchemeTagsNorm]     = { OPAQUE, baralpha, borderalpha },
-	[SchemeTagsSel]      = { OPAQUE, baralpha, borderalpha },
+	[SchemeNorm]         = { a0,     BG_ALPHA, a0 },
+	[SchemeSel]          = { a0,     a0,       BG_ALPHA },
+	[SchemeTagsNorm]     = { OPAQUE, BG_ALPHA, a0 },
+	[SchemeTagsSel]      = { OPAQUE, BG_ALPHA, a0 },
 	// Layout symbol
-	[SchemeLtSymbol]     = { OPAQUE, baralpha, borderalpha },
+	[SchemeLtSymbol]     = { OPAQUE, BG_ALPHA, a0 },
 	// Tile layout
-	[SchemeFlexActTTB]   = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexInaTTB]   = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexSelTTB]   = { OPAQUE, 0xff,     borderalpha },
+	[SchemeFlexActTTB]   = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexInaTTB]   = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexSelTTB]   = { OPAQUE, OPAQUE,   OPAQUE },
 	// Monocle layout
-	[SchemeFlexActMONO]  = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexInaMONO]  = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexSelMONO]  = { OPAQUE, 0xff,     borderalpha },
+	[SchemeFlexActMONO]  = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexInaMONO]  = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexSelMONO]  = { OPAQUE, OPAQUE,   OPAQUE },
 	// Nrowgrid layout
-	[SchemeFlexActGRD1]  = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexInaGRD1]  = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexSelGRD1]  = { OPAQUE, 0xff,     borderalpha },
+	[SchemeFlexActGRD1]  = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexInaGRD1]  = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexSelGRD1]  = { OPAQUE, OPAQUE,   OPAQUE },
 	// Float window
-	[SchemeFlexActFloat] = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexInaFloat] = { OPAQUE, baralpha, borderalpha },
-	[SchemeFlexSelFloat] = { OPAQUE, 0xff,     borderalpha },
+	[SchemeFlexActFloat] = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexInaFloat] = { OPAQUE, BG_ALPHA, BORDER_ALPHA },
+	[SchemeFlexSelFloat] = { OPAQUE, OPAQUE,   OPAQUE },
 };
 
 static char *colors[][ColCount] = {
 	/*                       fg                bg                border                float border */
 	// Default
 	[SchemeNorm]         = { c000000,          BG_COLOR,         c000000,              c000000 },
-	[SchemeSel]          = { c000000,          c000000,          BORDER_COLOR,         c000000 },
+	[SchemeSel]          = { c000000,          c000000,          BG_COLOR,             c000000 },
 	[SchemeTagsNorm]     = { FG_COLOR,         BG_COLOR,         c000000,              c000000 },
 	[SchemeTagsSel]      = { FG_COLOR,         BG_COLOR,         c000000,              c000000 },
 	// Layout symbol
@@ -180,7 +185,7 @@ static void setlayoutpreset(const Arg *arg)
 static char dmenumon[8]; /* component of dmenucmd, manipulated in spawn() */
 static const char *dmenucmd[] = {
 	"j4-dmenu-desktop",
-	"--dmenu=dmenu -i -p '>' -sb '#bc5653' -sf '#eeeeee' -nb '#222222' -fn 'Hack Nerd Font:size=10'",
+	"--dmenu=dmenu -i -sb '#b55a71' -sf '#eeeeee' -nb '#222222' -fn 'Hack Nerd Font:size=10'",
 	"--no-generic",
 	NULL
 };
