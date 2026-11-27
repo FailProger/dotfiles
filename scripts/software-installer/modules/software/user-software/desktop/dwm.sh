@@ -93,4 +93,5 @@ dwm__remove() {
 
 dwm__deconfigure() {
   rm -rf "$HOME/.local/bin/statusbar"
+  rm -rf "$HOME/.xinitrc"
 }
