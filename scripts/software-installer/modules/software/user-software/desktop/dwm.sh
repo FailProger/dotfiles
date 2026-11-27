@@ -78,6 +78,8 @@ dwm__configure() {
   rm -rf "$bin_dir/statusbar"
   mkdir -p "$bin_dir"
   cp -r "$LOCAL_DIR/bin/statusbar" "$bin_dir"
+
+  lib__cp_config 'X11/xinitrc' "$HOME/.xinitrc"
 }
 
 dwm__is_installed() {
