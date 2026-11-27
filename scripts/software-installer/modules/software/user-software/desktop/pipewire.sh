@@ -25,3 +25,17 @@ pipewire__configure() {
   lib__cp_config 'pipewire'
   lib__as_root usermod -aG pipewire "$USER"
 }
+
+pipewire__is_installed() {
+  lib__apt_is_installed pipewire && lib__apt_is_installed wireplumber
+}
+
+pipewire__remove() {
+  lib__apt_remove pipewire pipewire-pulse pipewire-jack wireplumber
+}
+
+pipewire__deconfigure() {
+  systemctl --user disable --now pipewire pipewire-pulse wireplumber 2> /dev/null || true
+  rm -rf "$HOME/.config/pipewire"
+  lib__as_root gpasswd -d "$USER" pipewire 2> /dev/null || true
+}

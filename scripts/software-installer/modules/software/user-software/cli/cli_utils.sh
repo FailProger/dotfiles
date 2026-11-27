@@ -25,3 +25,15 @@ cli_utils__install() {
 cli_utils__configure() {
   return 0
 }
+
+cli_utils__is_installed() {
+  lib__apt_is_installed curl && lib__apt_is_installed wget
+}
+
+cli_utils__remove() {
+  lib__apt_remove wget curl openssh-client zip unzip 7zip gzip xz-utils zstd
+}
+
+cli_utils__deconfigure() {
+  return 0
+}

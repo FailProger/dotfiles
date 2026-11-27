@@ -37,7 +37,7 @@ hydra__get_runtime_dependencies() {
 hydra__install() {
   local workdir
 
-  workdir="$(mktemp -d)"
+  workdir="$(lib__tmpdir)"
 
   (
     cd "$workdir"
@@ -49,10 +49,21 @@ hydra__install() {
     make
     lib__as_root make install
   )
-
-  rm -rf "$workdir"
 }
 
 hydra__configure() {
+  return 0
+}
+
+hydra__is_installed() {
+  command -v hydra > /dev/null 2>&1
+}
+
+hydra__remove() {
+  lib__as_root rm -f /usr/local/bin/hydra /usr/local/bin/xhydra /usr/local/bin/pw-inspector /usr/local/bin/dpl4hydra
+  lib__as_root rm -f /usr/local/share/man/man1/hydra.1 /usr/local/share/man/man1/xhydra.1
+}
+
+hydra__deconfigure() {
   return 0
 }

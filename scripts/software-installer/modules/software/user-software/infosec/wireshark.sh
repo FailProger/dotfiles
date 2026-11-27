@@ -16,3 +16,15 @@ wireshark__configure() {
 
   lib__as_root usermod -aG wireshark "$USER"
 }
+
+wireshark__is_installed() {
+  lib__apt_is_installed wireshark
+}
+
+wireshark__remove() {
+  lib__apt_remove wireshark
+}
+
+wireshark__deconfigure() {
+  lib__as_root gpasswd -d "$USER" wireshark 2> /dev/null || true
+}

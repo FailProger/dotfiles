@@ -4,6 +4,7 @@ live_config_reload = true
 
 [window]
 title = "Terminal"
+opacity = 0.95
 
 [font]
 normal.family = "Hack Nerd Font"

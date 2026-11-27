@@ -13,3 +13,15 @@ ftp__install() {
 ftp__configure() {
   return 0
 }
+
+ftp__is_installed() {
+  lib__apt_is_installed ftp
+}
+
+ftp__remove() {
+  lib__apt_remove ftp
+}
+
+ftp__deconfigure() {
+  return 0
+}

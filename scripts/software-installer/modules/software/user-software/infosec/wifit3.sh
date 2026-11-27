@@ -20,3 +20,15 @@ wifit3__install() {
 wifit3__configure() {
   return 0
 }
+
+wifit3__is_installed() {
+  command -v wifit3 > /dev/null 2>&1
+}
+
+wifit3__remove() {
+  lib__as_root rm -f /usr/local/bin/wifit3
+}
+
+wifit3__deconfigure() {
+  return 0
+}

@@ -20,7 +20,7 @@ nmap__get_runtime_dependencies() {
 nmap__install() {
   local workdir
 
-  workdir="$(mktemp -d)"
+  workdir="$(lib__tmpdir)"
 
   (
     cd "$workdir"
@@ -32,11 +32,22 @@ nmap__install() {
     make
     lib__as_root make install
   )
-
-  rm -rf "$workdir"
 }
 
 nmap__configure() {
   lib__as_root update-alternatives --install /usr/bin/nc nc /usr/local/bin/ncat 100
   lib__as_root update-alternatives --install /usr/bin/ping ping /usr/local/bin/nping 100
+}
+
+nmap__is_installed() {
+  command -v nmap > /dev/null 2>&1
+}
+
+nmap__remove() {
+  lib__as_root rm -f /usr/local/bin/nmap /usr/local/bin/ncat /usr/local/bin/nping
+}
+
+nmap__deconfigure() {
+  lib__as_root update-alternatives --remove nc /usr/local/bin/ncat 2> /dev/null || true
+  lib__as_root update-alternatives --remove ping /usr/local/bin/nping 2> /dev/null || true
 }

@@ -22,3 +22,15 @@ stegseek__install() {
 stegseek__configure() {
   return 0
 }
+
+stegseek__is_installed() {
+  lib__apt_is_installed stegseek
+}
+
+stegseek__remove() {
+  lib__apt_remove stegseek
+}
+
+stegseek__deconfigure() {
+  return 0
+}

@@ -7,17 +7,23 @@ else
   export EDITOR='nvim'
 fi
 
+
 # --- COMPLETION PARAMS ---
+
 zstyle ':completion:*:*:*:*:globbed-files' matcher 'r:|?=** m:{a-z\-}={A-Z\_}'
 zstyle ':completion:*:*:*:*:local-directories' matcher 'r:|?=** m:{a-z\-}={A-Z\_}'
 zstyle ':completion:*:*:*:*:directories' matcher 'r:|?=** m:{a-z\-}={A-Z\_}'
 
+
 # --- ALIASES ---
+
 alias str='sudo -E -s'  # Switch To Root
 alias snvim='sudo -E nvim'
 alias feh='feh --scale-down'
 
+
 # --- CLI UTILS ---
+
 # Configure eza
 eza_params='-lbF --group-directories-first --no-time --smart-group --icons --git'
 
@@ -44,7 +50,9 @@ unset zoxide_cmd
 # Shellfirm init
 eval "$(shellfirm init zsh)"
 
+
 # --- INFOSEC TOOLS ---
+
 # Configure John the Ripper
 export PATH="$PATH:/opt/john-the-ripper"
 alias sjohn='sudo john'

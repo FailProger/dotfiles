@@ -12,10 +12,21 @@ declare -A MODULE_BUILD_PACKAGES=()
 declare -A MODULE_RUNTIME_PACKAGES=()
 declare -A MODULE_BUILD_MODULES=()
 declare -A MODULE_RUNTIME_MODULES=()
-declare -A MODULE_HAS_REMOVE=()
-declare -A MODULE_REMOVABLE=()
 declare -A MODULE_ROLE=()
 declare -A MODULE_ACTIVE_INSTALL=()
+
+# Removal/deconfiguration plan.
+declare -a REMOVE_MODULES=()
+declare -a REMOVE_NAMES=()
+declare -a REMOVE_KEYS=()
+declare -a REMOVE_BLOCKED=()
+declare -a REMOVE_SKIPPED=()
+declare -a REMOVE_REMOVED=()
+declare -a REMOVE_DECONFIGURED=()
+declare -a REMOVE_KEPT=()
+declare -a REMOVE_FAILED=()
+REMOVE_PROGRAM=1
+REMOVE_CONFIG=0
 
 # Dependency sets.
 declare -a INSTALL_BUILD_ALL=()
@@ -269,7 +280,10 @@ _collect_module() {
   source "$module_file"
 
   if ! declare -F "${module}__install" > /dev/null \
-    || ! declare -F "${module}__configure" > /dev/null; then
+    || ! declare -F "${module}__configure" > /dev/null \
+    || ! declare -F "${module}__is_installed" > /dev/null \
+    || ! declare -F "${module}__remove" > /dev/null \
+    || ! declare -F "${module}__deconfigure" > /dev/null; then
     lib__log_error "Module '$module' does not implement the module contract."
     return 1
   fi
@@ -277,7 +291,6 @@ _collect_module() {
   declare -F "${module}__get_build_dependencies" > /dev/null && has_build=1
   declare -F "${module}__get_runtime_dependencies" > /dev/null && has_runtime=1
   declare -F "${module}__get_dependencies" > /dev/null && has_legacy=1
-  declare -F "${module}__remove" > /dev/null && MODULE_HAS_REMOVE["$module_file"]=1
 
   if [[ "$has_build" -eq 0 && "$has_runtime" -eq 0 && "$has_legacy" -eq 0 ]]; then
     lib__log_error "Module '$module' does not declare build or runtime dependencies."
@@ -335,8 +348,6 @@ collect_modules() {
   MODULE_RUNTIME_PACKAGES=()
   MODULE_BUILD_MODULES=()
   MODULE_RUNTIME_MODULES=()
-  MODULE_HAS_REMOVE=()
-  MODULE_REMOVABLE=()
   MODULE_ROLE=()
   MODULE_ACTIVE_INSTALL=()
   _MODULE_VISITED=()
@@ -352,41 +363,10 @@ orchestrator__plan() {
   collect_modules || return 1
 }
 
-# Mark requested modules as installed. Only the install phase is marked;
-# configure state is left as it is.
-orchestrator__mark_installed() {
-  local module_file
-  local key
-  local dir
-  local fingerprint
-
-  queue_modules "$@" || return 1
-
-  lib__state_init
-  lib__state_lock || return 1
-
-  for module_file in "${INSTALL_REQUESTED[@]}"; do
-    key="$(_module_key "$module_file")"
-    dir="$(lib__state_module_dir "$key")"
-    fingerprint="$(lib__state_fingerprint "$module_file")"
-
-    lib__state_module_init "$key" "$module_file"
-    lib__state_write "$dir/install.done" "$fingerprint"
-    lib__state_mark_manual "$key"
-    rm -f "$dir/install.failed" "$dir/install.running"
-  done
-
-  lib__state_unlock
-}
-
 _assign_role() {
   local module_file="$1"
   local desired="$2"
   local current="${MODULE_ROLE[$module_file]:-}"
-
-  if [[ "$desired" == 'build' && -z "${MODULE_REMOVABLE[$module_file]:-}" ]]; then
-    desired='runtime'
-  fi
 
   case "$current" in
     requested|runtime)
@@ -410,7 +390,6 @@ _assign_role() {
 
 orchestrator__compute_roles() {
   local module_file
-  local key
   local role
   local dependency
   local desired
@@ -418,15 +397,6 @@ orchestrator__compute_roles() {
   local -a dependencies=()
 
   MODULE_ROLE=()
-  MODULE_REMOVABLE=()
-
-  for module_file in "${INSTALL_QUEUE[@]}"; do
-    key="$(_module_key "$module_file")"
-    if [[ -n "${MODULE_HAS_REMOVE[$module_file]:-}" ]] \
-      && ! lib__state_is_manual_marked "$key"; then
-      MODULE_REMOVABLE["$module_file"]=1
-    fi
-  done
 
   for module_file in "${INSTALL_REQUESTED[@]}"; do
     MODULE_ROLE["$module_file"]='requested'
@@ -481,6 +451,508 @@ _module_is_present() {
 
   declare -F "${module}__is_installed" > /dev/null || return 1
   "${module}__is_installed" > /dev/null 2>&1
+}
+
+_all_module_files() {
+  find "$SOFTWARE_DIR" -type f -name '*.sh' -print | sort
+}
+
+_module_is_installed_module() {
+  local module_file="${1:?'Do not get module file!'}"
+  local key
+
+  key="$(_module_key "$module_file")"
+  lib__state_has_install "$key"
+}
+
+# An install attempt that failed may have left partial artifacts behind. It is
+# still ours and must be removable even when __is_installed now returns true.
+_module_install_attempted() {
+  local module_file="${1:?'Do not get module file!'}"
+  local key
+
+  key="$(_module_key "$module_file")"
+  lib__state_phase_marked "$key" install \
+    || [[ -f "$(lib__state_module_dir "$key")/install.failed" ]]
+}
+
+_module_is_configured() {
+  local module_file="${1:?'Do not get module file!'}"
+  local key
+
+  key="$(_module_key "$module_file")"
+  lib__state_phase_marked "$key" configure
+}
+
+_installed_module_files() {
+  local module_file
+
+  while IFS= read -r module_file; do
+    [[ -n "$module_file" ]] || continue
+    _module_is_installed_module "$module_file" && printf '%s\n' "$module_file"
+  done < <(_all_module_files)
+}
+
+_module_runtime_dependency_files() {
+  local module_file="${1:?'Do not get module file!'}"
+  local module
+  local raw
+  local dependency
+  local -a matches=()
+
+  module="$(_module_name "$module_file")"
+
+  # shellcheck disable=SC1090
+  source "$module_file" || return 1
+
+  if ! raw="$("${module}__get_runtime_dependencies")"; then
+    lib__log_error "Failed to read runtime dependencies of '$module'."
+    return 1
+  fi
+
+  while IFS= read -r dependency; do
+    dependency="${dependency//[[:space:]]/}"
+    [[ -n "$dependency" ]] || continue
+    mapfile -t matches < <(_find_module_files "$dependency")
+    [[ ${#matches[@]} -eq 1 ]] || continue
+    realpath "${matches[0]}"
+  done < <(_module_deps_from_string "$raw")
+}
+
+_module_runtime_dependents() {
+  local target="${1:?'Do not get module file!'}"
+  local module_file
+  local dependency
+
+  while IFS= read -r module_file; do
+    [[ "$module_file" != "$target" ]] || continue
+    while IFS= read -r dependency; do
+      if [[ "$dependency" == "$target" ]]; then
+        printf '%s\n' "$module_file"
+        break
+      fi
+    done < <(_module_runtime_dependency_files "$module_file")
+  done < <(_installed_module_files)
+}
+
+# Run __remove for one module. Keeps configure state intact.
+_orchestrator_remove_program() {
+  local module_file="${1:?'Do not get module file!'}"
+  local module
+  local key
+  local rc
+  local errexit=0
+
+  case "$-" in
+    *e*) errexit=1 ;;
+  esac
+
+  module="$(_module_name "$module_file")"
+  key="$(_module_key "$module_file")"
+
+  # shellcheck disable=SC1090
+  if ! source "$module_file"; then
+    lib__log_error "Cannot load module '$module'."
+    REMOVE_FAILED+=("$module:load")
+    MANIFEST_MODULES_FAILED+=("$module:remove")
+    return 1
+  fi
+
+  if ! declare -F "${module}__remove" > /dev/null; then
+    lib__log_error "Module '$module' has no __remove."
+    REMOVE_FAILED+=("$module:contract")
+    MANIFEST_MODULES_FAILED+=("$module:remove")
+    return 1
+  fi
+
+  lib__state_module_init "$key" "$module_file"
+  MODULE_NAME="$module"
+
+  set +e
+  lib__state_run_action "$key" 'remove' "$module_file" "${module}__remove"
+  rc=$?
+  [[ "$errexit" -eq 1 ]] && set -e
+
+  if [[ "$rc" -eq 0 ]]; then
+    lib__state_clear_manual "$key"
+    rm -f "$(lib__state_module_dir "$key")/install.done" \
+      "$(lib__state_module_dir "$key")/install.failed" \
+      "$(lib__state_module_dir "$key")/install.running"
+    REMOVE_REMOVED+=("$module")
+    MANIFEST_MODULES_REMOVED+=("$module")
+    return 0
+  fi
+
+  if [[ "$rc" -eq 3 ]]; then
+    REMOVE_KEPT+=("$module")
+    MANIFEST_MODULES_KEPT+=("$module")
+    return 3
+  fi
+
+  REMOVE_FAILED+=("$module:remove")
+  MANIFEST_MODULES_FAILED+=("$module:remove")
+  return "$rc"
+}
+
+# Run __deconfigure for one module. Keeps program and install state intact.
+_orchestrator_deconfigure() {
+  local module_file="${1:?'Do not get module file!'}"
+  local module
+  local key
+  local rc
+  local errexit=0
+
+  case "$-" in
+    *e*) errexit=1 ;;
+  esac
+
+  module="$(_module_name "$module_file")"
+  key="$(_module_key "$module_file")"
+
+  # shellcheck disable=SC1090
+  if ! source "$module_file"; then
+    lib__log_error "Cannot load module '$module'."
+    REMOVE_FAILED+=("$module:load")
+    MANIFEST_MODULES_FAILED+=("$module:deconfigure")
+    return 1
+  fi
+
+  if ! declare -F "${module}__deconfigure" > /dev/null; then
+    lib__log_error "Module '$module' has no __deconfigure."
+    REMOVE_FAILED+=("$module:contract")
+    MANIFEST_MODULES_FAILED+=("$module:deconfigure")
+    return 1
+  fi
+
+  lib__state_module_init "$key" "$module_file"
+  MODULE_NAME="$module"
+
+  set +e
+  lib__state_run_action "$key" 'deconfigure' "$module_file" "${module}__deconfigure"
+  rc=$?
+  [[ "$errexit" -eq 1 ]] && set -e
+
+  if [[ "$rc" -eq 0 ]]; then
+    rm -f "$(lib__state_module_dir "$key")/configure.done" \
+      "$(lib__state_module_dir "$key")/configure.failed" \
+      "$(lib__state_module_dir "$key")/configure.running"
+    REMOVE_DECONFIGURED+=("$module")
+    return 0
+  fi
+
+  if [[ "$rc" -eq 3 ]]; then
+    REMOVE_KEPT+=("$module:deconfigure")
+    MANIFEST_MODULES_KEPT+=("$module:deconfigure")
+    return 3
+  fi
+
+  REMOVE_FAILED+=("$module:deconfigure")
+  MANIFEST_MODULES_FAILED+=("$module:deconfigure")
+  return "$rc"
+}
+
+# Remove managed dependency modules that no longer have an installed
+# manual/external dependent. Configurations are intentionally kept: only
+# __remove runs here.
+orchestrator__autoremove_modules() {
+  local module_file
+  local key
+  local rc
+  local changed=1
+  local failed=0
+  local -A needed=()
+  local -a queue=()
+
+  while IFS= read -r module_file; do
+    key="$(_module_key "$module_file")"
+    if lib__state_is_manual "$key" || lib__state_is_external "$key"; then
+      needed["$module_file"]=1
+      queue+=("$module_file")
+    fi
+  done < <(_installed_module_files)
+
+  while [[ ${#queue[@]} -gt 0 ]]; do
+    module_file="${queue[0]}"
+    queue=("${queue[@]:1}")
+    while IFS= read -r dependency; do
+      if [[ -z "${needed[$dependency]:-}" ]]; then
+        needed["$dependency"]=1
+        queue+=("$dependency")
+      fi
+    done < <(_module_runtime_dependency_files "$module_file")
+  done
+
+  while [[ "$changed" -eq 1 ]]; do
+    changed=0
+
+    while IFS= read -r module_file; do
+      [[ -z "${needed[$module_file]:-}" ]] || continue
+
+      key="$(_module_key "$module_file")"
+      lib__state_is_manual "$key" && continue
+      lib__state_is_external "$key" && continue
+      _module_is_installed_module "$module_file" || continue
+
+      if [[ -n "$(_module_runtime_dependents "$module_file")" ]]; then
+        continue
+      fi
+
+      set +e
+      _orchestrator_remove_program "$module_file"
+      rc=$?
+      set -e
+
+      if [[ "$rc" -eq 0 ]]; then
+        changed=1
+      elif [[ "$rc" -ne 3 ]]; then
+        failed=1
+      fi
+    done < <(_installed_module_files)
+  done
+
+  return "$failed"
+}
+
+orchestrator__remove_plan() {
+  local module_file
+  local dependent_file
+  local module
+  local key
+  local -a dependents=()
+  local -A target_set=()
+
+  queue_modules "$@" || return 1
+  lib__state_load
+
+  REMOVE_MODULES=()
+  REMOVE_NAMES=()
+  REMOVE_KEYS=()
+  REMOVE_BLOCKED=()
+  REMOVE_SKIPPED=()
+  REMOVE_REMOVED=()
+  REMOVE_DECONFIGURED=()
+  REMOVE_KEPT=()
+  REMOVE_FAILED=()
+
+  for module_file in "${INSTALL_REQUESTED[@]}"; do
+    target_set["$module_file"]=1
+  done
+
+  for module_file in "${INSTALL_REQUESTED[@]}"; do
+    module="$(_module_name "$module_file")"
+    key="$(_module_key "$module_file")"
+
+    # shellcheck disable=SC1090
+    if ! source "$module_file"; then
+      lib__log_error "Cannot load module '$module'."
+      return 1
+    fi
+
+    REMOVE_MODULES+=("$module_file")
+    REMOVE_NAMES+=("$module")
+    REMOVE_KEYS+=("$key")
+
+    if [[ "$REMOVE_PROGRAM" -eq 1 ]]; then
+      if ! lib__state_has_install "$key"; then
+        if _module_install_attempted "$module_file"; then
+          : # partial install from a failed run; allow __remove to clean it
+        elif _module_is_present "$module_file"; then
+          REMOVE_BLOCKED+=("$module: installed outside the installer; use reinstall to adopt it")
+        else
+          REMOVE_SKIPPED+=("$module: not installed")
+        fi
+      elif lib__state_is_external "$key"; then
+        REMOVE_BLOCKED+=("$module: installed outside the installer; use reinstall to adopt it")
+      else
+        dependents=()
+        while IFS= read -r dependent_file; do
+          [[ -z "${target_set[$dependent_file]:-}" ]] || continue
+          dependents+=("$(_module_name "$dependent_file")")
+        done < <(_module_runtime_dependents "$module_file")
+
+        if [[ ${#dependents[@]} -gt 0 ]]; then
+          REMOVE_BLOCKED+=("$module: needed by ${dependents[*]}; remove the dependent module first")
+        fi
+      fi
+    fi
+
+    if [[ "$REMOVE_CONFIG" -eq 1 ]] && ! _module_is_configured "$module_file"; then
+      REMOVE_SKIPPED+=("$module: not configured")
+    fi
+  done
+}
+
+orchestrator__print_remove_plan() {
+  local item
+
+  printf '%-9s %s%s%s (uid %s)\n' 'User' "$UI_BOLD" "$USER" "$UI_RESET" "$UID"
+  printf '%-9s %s\n' 'Home' "$HOME"
+  printf '%-9s %s\n' 'State' "$(lib__ui_tilde_path "$STATE_ROOT")"
+
+  if [[ "$REMOVE_PROGRAM" -eq 1 && "$REMOVE_CONFIG" -eq 1 ]]; then
+    printf '%-9s %sremove program and configuration%s\n' 'Action' "$UI_BOLD$UI_YELLOW" "$UI_RESET"
+  elif [[ "$REMOVE_PROGRAM" -eq 1 ]]; then
+    printf '%-9s %sremove program, keep configuration%s\n' 'Action' "$UI_BOLD$UI_YELLOW" "$UI_RESET"
+  else
+    printf '%-9s %sremove configuration, keep program%s\n' 'Action' "$UI_BOLD$UI_YELLOW" "$UI_RESET"
+  fi
+
+  if [[ "$INSTALL_DRY_RUN" -eq 1 ]]; then
+    printf '%-9s %syes, nothing will be changed%s\n' 'Dry run' "$UI_YELLOW" "$UI_RESET"
+  fi
+
+  printf '\nModules: %s selected\n' "${#REMOVE_MODULES[@]}"
+
+  for item in "${REMOVE_MODULES[@]}"; do
+    printf '  %s%s %s%s\n' "$UI_YELLOW" "$UI_ARROW" "$(_module_display_name "$item")" "$UI_RESET"
+  done
+
+  for item in "${REMOVE_BLOCKED[@]}"; do
+    printf '  %s%s%s %s\n' "$UI_RED" "$UI_FAIL" "$UI_RESET" "$item"
+  done
+
+  for item in "${REMOVE_SKIPPED[@]}"; do
+    printf '  %s%s %s%s\n' "$UI_DIM" "$UI_SKIP" "$item" "$UI_RESET"
+  done
+
+  if [[ ${#REMOVE_BLOCKED[@]} -gt 0 ]]; then
+    printf '\n  %sNothing will be changed until the blockers are resolved.%s\n' "$UI_YELLOW" "$UI_RESET"
+  fi
+
+  printf '\n'
+}
+
+orchestrator__remove_run() {
+  local index
+  local module_file
+  local module
+  local key
+  local rc
+  local program_rc=0
+  local program_requested
+  local config_requested
+  local failed=0
+  local removed_any=0
+
+  if [[ ${#REMOVE_BLOCKED[@]} -gt 0 ]]; then
+    local item
+    for item in "${REMOVE_BLOCKED[@]}"; do
+      lib__log_error "$item"
+    done
+    return 1
+  fi
+
+  lib__state_init
+  lib__state_lock || return 1
+  lib__manifest_begin || {
+    lib__state_unlock
+    return 1
+  }
+
+  MANIFEST_KEEP_BUILD_DEPS="$INSTALL_KEEP_BUILD_DEPS"
+  MANIFEST_FORCE_CLEAN="$INSTALL_FORCE_CLEAN"
+
+  for module_file in "${REMOVE_MODULES[@]}"; do
+    MANIFEST_MODULES_REQUESTED+=("$(_module_name "$module_file")")
+  done
+
+  for index in "${!REMOVE_MODULES[@]}"; do
+    module_file="${REMOVE_MODULES[$index]}"
+    module="${REMOVE_NAMES[$index]}"
+    key="${REMOVE_KEYS[$index]}"
+    program_rc=0
+    program_requested=0
+    config_requested=0
+
+    if [[ "$REMOVE_PROGRAM" -eq 1 ]] \
+      && { lib__state_has_install "$key" || _module_install_attempted "$module_file"; }; then
+      if lib__state_is_external "$key"; then
+        lib__log_error "$module: installed outside the installer; keeping it."
+        REMOVE_FAILED+=("$module:external")
+        MANIFEST_MODULES_FAILED+=("$module:remove")
+        failed=1
+        continue
+      fi
+      program_requested=1
+    fi
+
+    if [[ "$REMOVE_CONFIG" -eq 1 ]] && _module_is_configured "$module_file"; then
+      config_requested=1
+    fi
+
+    if [[ "$program_requested" -eq 0 && "$config_requested" -eq 0 ]]; then
+      REMOVE_SKIPPED+=("$module: nothing to do")
+      continue
+    fi
+
+    if [[ "$program_requested" -eq 1 ]]; then
+      set +e
+      _orchestrator_remove_program "$module_file"
+      program_rc=$?
+      set -e
+
+      if [[ "$program_rc" -eq 0 ]]; then
+        removed_any=1
+      elif [[ "$program_rc" -eq 3 ]]; then
+        # The program was kept (for example, an apt reverse dependency).
+        # Do not deconfigure it in the same run.
+        failed=1
+        continue
+      else
+        failed=1
+        continue
+      fi
+    fi
+
+    if [[ "$config_requested" -eq 1 ]]; then
+      set +e
+      _orchestrator_deconfigure "$module_file"
+      rc=$?
+      set -e
+      if [[ "$rc" -ne 0 ]]; then
+        failed=1
+      fi
+    fi
+  done
+
+  if [[ "$removed_any" -eq 1 && "$failed" -eq 0 ]]; then
+    orchestrator__autoremove_modules || failed=1
+  fi
+
+  for module in "${REMOVE_REMOVED[@]}"; do
+    lib__log_success "Removed program: $module"
+  done
+  for module in "${REMOVE_DECONFIGURED[@]}"; do
+    lib__log_success "Removed configuration: $module"
+  done
+  for module in "${REMOVE_KEPT[@]}"; do
+    lib__log_warn "Kept: $module"
+  done
+  for module in "${REMOVE_FAILED[@]}"; do
+    lib__log_error "Failed: $module"
+  done
+
+  if [[ "$failed" -eq 0 ]]; then
+    MANIFEST_STATUS='success'
+    lib__state_unlock
+    if [[ "$REMOVE_PROGRAM" -eq 0 ]]; then
+      lib__log_success 'Selected configurations were removed.'
+    elif [[ "$REMOVE_CONFIG" -eq 1 ]]; then
+      lib__log_success 'Selected programs and configurations were removed.'
+    else
+      lib__log_success 'Selected programs were removed.'
+    fi
+    return 0
+  fi
+
+  MANIFEST_STATUS='failed'
+  lib__state_unlock
+  if [[ "$REMOVE_PROGRAM" -eq 0 ]]; then
+    lib__log_error 'Deconfiguration finished with errors.'
+  else
+    lib__log_error 'Removal finished with errors.'
+  fi
+  return 1
 }
 
 # A build-only module is needed only when some requested/runtime module that
@@ -680,6 +1152,11 @@ orchestrator__phase_enabled() {
 }
 
 orchestrator__mode_label() {
+  if [[ "$INSTALL_FORCE" -eq 1 ]]; then
+    printf 'reinstall (force deps + install + configure)\n'
+    return 0
+  fi
+
   case "$INSTALL_MODE" in
     install)
       printf 'install-only (deps + install)\n'
@@ -704,7 +1181,13 @@ orchestrator__phase_status() {
     printf 'skipped'
   elif [[ "$INSTALL_FORCE" -eq 1 ]]; then
     printf 'pending'
+  elif [[ "$phase" == 'install' ]] && lib__state_is_external "$key"; then
+    printf 'done'
   elif lib__state_phase_done "$key" "$phase" "$module_file"; then
+    printf 'done'
+  elif [[ "$phase" == 'install' ]] \
+    && ! lib__state_phase_marked "$key" install \
+    && _module_is_present "$module_file"; then
     printf 'done'
   else
     printf 'pending'
@@ -715,8 +1198,16 @@ _module_has_pending_install() {
   local key="${1:?'Do not get module key!'}"
   local module_file="${2:?'Do not get module file!'}"
 
-  orchestrator__phase_enabled "$module_file" install \
-    && [[ "$(orchestrator__phase_status "$key" install "$module_file")" == 'pending' ]]
+  orchestrator__phase_enabled "$module_file" install || return 1
+  [[ "$(orchestrator__phase_status "$key" install "$module_file")" == 'pending' ]] || return 1
+
+  # A program that is present but not recorded yet will be marked external,
+  # not installed. Do not pull its build dependencies for nothing.
+  if ! lib__state_phase_marked "$key" install && _module_is_present "$module_file"; then
+    return 1
+  fi
+
+  return 0
 }
 
 _module_has_pending() {
@@ -863,7 +1354,7 @@ orchestrator__print_plan() {
   fi
 
   if [[ "$INSTALL_FORCE" -eq 1 ]]; then
-    printf '%-9s %syes, saved phase state is ignored%s\n' 'Force' "$UI_YELLOW" "$UI_RESET"
+    printf '%-9s %syes, install and configure run again%s\n' 'Reinstall' "$UI_YELLOW" "$UI_RESET"
   fi
 
   if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 ]]; then
@@ -966,11 +1457,7 @@ orchestrator__print_plan() {
 
     for module_file in "${INSTALL_BUILD_ONLY_MODULES[@]}"; do
       module_label="$(_module_display_name "$module_file")"
-      if [[ -n "${MODULE_REMOVABLE[$module_file]:-}" ]]; then
-        printf '    %s%s %s%s\n' "$UI_DIM" "$UI_ARROW" "$module_label" "$UI_RESET"
-      else
-        printf '    %s%s %s (kept: no __remove)%s\n' "$UI_DIM" "$UI_ARROW" "$module_label" "$UI_RESET"
-      fi
+      printf '    %s%s %s%s\n' "$UI_DIM" "$UI_ARROW" "$module_label" "$UI_RESET"
     done
   fi
 
@@ -1001,16 +1488,6 @@ orchestrator__print_plan() {
   printf '\n'
 }
 
-orchestrator__reset() {
-  local module_file
-
-  lib__state_load
-
-  for module_file in "${INSTALL_REQUESTED[@]}"; do
-    lib__state_reset "$(_module_key "$module_file")"
-  done
-}
-
 orchestrator__should_skip() {
   local key="${1:?'Do not get module key!'}"
   local phase="${2:?'Do not get phase!'}"
@@ -1018,6 +1495,10 @@ orchestrator__should_skip() {
 
   if [[ "$INSTALL_FORCE" -eq 1 ]]; then
     return 1
+  fi
+
+  if [[ "$phase" == 'install' ]] && lib__state_is_external "$key"; then
+    return 0
   fi
 
   lib__state_phase_done "$key" "$phase" "$module_file"
@@ -1140,6 +1621,15 @@ orchestrator__has_pending_work() {
   local package
   local lists_present=0
 
+  if [[ "$INSTALL_MODE" != 'configure' ]]; then
+    for module_file in "${INSTALL_REQUESTED[@]}"; do
+      key="$(_module_key "$module_file")"
+      if ! lib__state_is_manual "$key"; then
+        return 0
+      fi
+    done
+  fi
+
   if lib__apt_lists_present; then
     lists_present=1
   fi
@@ -1203,16 +1693,23 @@ orchestrator__print_resume() {
     names+=("$(_module_name "$module_file")")
   done
 
-  flags=(-y)
-
   case "$INSTALL_MODE" in
     install)
-      flags+=(--install-only)
+      flags+=(install --no-configure)
       ;;
     configure)
-      flags+=(--configure-only)
+      flags+=(configure)
+      ;;
+    *)
+      if [[ "$INSTALL_FORCE" -eq 1 ]]; then
+        flags+=(reinstall)
+      else
+        flags+=(install)
+      fi
       ;;
   esac
+
+  flags+=(-y)
 
   if [[ "$INSTALL_KEEP_GOING" -eq 1 ]]; then
     flags+=(--keep-going)
@@ -1264,9 +1761,20 @@ orchestrator__remove_module() {
   local module
   local key
   local rc
+  local errexit=0
+
+  case "$-" in
+    *e*) errexit=1 ;;
+  esac
 
   module="$(_module_name "$module_file")"
   key="$(_module_key "$module_file")"
+
+  if lib__state_is_external "$key" || lib__state_is_manual "$key"; then
+    INSTALL_KEPT_BUILD_ONLY+=("$module")
+    MANIFEST_MODULES_KEPT+=("$module")
+    return 0
+  fi
 
   # shellcheck disable=SC1090
   if ! source "$module_file"; then
@@ -1276,34 +1784,27 @@ orchestrator__remove_module() {
     return 0
   fi
 
-  if ! declare -F "${module}__remove" > /dev/null; then
-    lib__log_warn "Build-only module '$module' has no __remove; keeping it."
-    INSTALL_KEPT_BUILD_ONLY+=("$module")
-    MANIFEST_MODULES_KEPT+=("$module")
-    return 0
-  fi
-
   lib__state_module_init "$key" "$module_file"
   MODULE_NAME="$module"
 
-  # Call the phase outside any condition context and capture its status.
-  # A condition such as `if ! phase` disables errexit inside the phase, which
-  # would let a module continue after a failed build command.
+  # Call the action outside any condition context and capture its status.
+  # A condition such as `if ! action` disables errexit inside it, which would
+  # let a module continue after a failed build command.
   set +e
-  lib__state_run_phase "$key" 'remove' "$module_file" "${module}__remove"
+  lib__state_run_action "$key" 'remove' "$module_file" "${module}__remove"
   rc=$?
-  set -e
+  [[ "$errexit" -eq 1 ]] && set -e
 
   if [[ "$rc" -eq 0 ]]; then
-    if lib__state_was_kept; then
-      INSTALL_KEPT_BUILD_ONLY+=("$module")
-      MANIFEST_MODULES_KEPT+=("$module")
-    else
-      INSTALL_REMOVED+=("$module")
-      MANIFEST_MODULES_REMOVED+=("$module")
-    fi
-
+    INSTALL_REMOVED+=("$module")
+    MANIFEST_MODULES_REMOVED+=("$module")
     lib__state_reset "$key"
+    return 0
+  fi
+
+  if [[ "$rc" -eq 3 ]]; then
+    INSTALL_KEPT_BUILD_ONLY+=("$module")
+    MANIFEST_MODULES_KEPT+=("$module")
     return 0
   fi
 
@@ -1438,12 +1939,20 @@ orchestrator__run() {
 
   lib__cleanup_pending_load
 
-  # An explicit install request overrides a previous manual mark.
+  # An explicit install/reinstall request marks the module manual, like
+  # `apt install` marks a package manual. Dependencies do not get this marker.
   for module_file in "${INSTALL_REQUESTED[@]}"; do
     if orchestrator__phase_enabled "$module_file" install; then
-      lib__state_clear_manual_mark "$(_module_key "$module_file")"
+      lib__state_mark_manual "$(_module_key "$module_file")"
     fi
   done
+
+  # --keep-build-deps keeps build-only modules as manual dependencies.
+  if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 ]]; then
+    for module_file in "${INSTALL_BUILD_ONLY_MODULES[@]}"; do
+      lib__state_mark_manual "$(_module_key "$module_file")"
+    done
+  fi
 
   orchestrator__apt_snapshot_before
   MANIFEST_MANUAL_BEFORE=("${APT_MANUAL_BEFORE[@]}")
@@ -1535,10 +2044,23 @@ orchestrator__run() {
     source "$module_file"
 
     lib__state_module_init "$key" "$module_file"
+    MODULE_NAME="$module"
 
     if orchestrator__phase_enabled "$module_file" install; then
+      if [[ "$INSTALL_FORCE" -eq 0 ]] \
+        && ! lib__state_phase_marked "$key" install \
+        && ! lib__state_is_external "$key" \
+        && _module_is_present "$module_file"; then
+        lib__state_mark_external "$key"
+        lib__log_info "$key: program is already present; marking it external and keeping it."
+      fi
+
       if orchestrator__should_skip "$key" install "$module_file"; then
-        lib__log_info "$key: install already done, skipping."
+        if lib__state_is_external "$key" && [[ "$INSTALL_FORCE" -eq 0 ]]; then
+          lib__log_info "$key: external program, install skipped."
+        else
+          lib__log_info "$key: install already done, skipping."
+        fi
       else
         set +e
         lib__state_run_phase "$key" install "$module_file" "${module}__install"
@@ -1557,10 +2079,34 @@ orchestrator__run() {
           fi
           continue
         fi
+
+        if [[ "$INSTALL_FORCE" -eq 1 ]]; then
+          lib__state_clear_external "$key"
+        fi
       fi
     fi
 
     if orchestrator__phase_enabled "$module_file" configure; then
+      if [[ "$INSTALL_FORCE" -eq 0 ]] \
+        && ! lib__state_has_install "$key" \
+        && _module_is_present "$module_file"; then
+        lib__state_mark_external "$key"
+        lib__log_info "$key: program is already present; marking it external and keeping it."
+      fi
+
+      if ! lib__state_has_install "$key"; then
+        lib__log_error "$key: program is not installed; run install first."
+        failed=1
+        module_ok=0
+        INSTALL_FAILED+=("$module:configure")
+        MANIFEST_MODULES_FAILED+=("$module:configure")
+        failed_entries+=("$module:configure")
+        if [[ "$INSTALL_KEEP_GOING" -eq 0 ]]; then
+          break
+        fi
+        continue
+      fi
+
       if orchestrator__should_skip "$key" configure "$module_file"; then
         lib__log_info "$key: configure already done, skipping."
       else

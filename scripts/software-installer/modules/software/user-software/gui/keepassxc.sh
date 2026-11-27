@@ -22,3 +22,16 @@ keepassxc__install() {
 keepassxc__configure() {
   return 0
 }
+
+keepassxc__is_installed() {
+  lib__apt_is_installed keepassxc
+}
+
+keepassxc__remove() {
+  lib__apt_run add-apt-repository --remove -y ppa:phoerious/keepassxc 2> /dev/null || true
+  lib__apt_remove keepassxc
+}
+
+keepassxc__deconfigure() {
+  return 0
+}

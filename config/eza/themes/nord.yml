@@ -101,21 +101,28 @@ broken_path_overlay: {foreground: "#4C566A"}
 
 filenames:
   # --- PROGRAMMING ---
+
   "Cargo.toml": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}
   "CMakeLists.txt": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}
   "Makefile": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}
   "go.mod": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
   "package.json": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   
+
   # --- WEB ---
+
   "Dockerfile": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
   "docker-compose.yml": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
   
+
   # --- DOCUMENTS ---
+  
   "README.md": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   "LICENSE": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
 
+
   # --- CONFIG FILES ---
+
   ".gitignore": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
   ".env": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   ".dockerignore": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
@@ -128,14 +135,18 @@ filenames:
   "shell.nix": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   "default.nix": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   
+
   # --- PATTERNS ---
+
   "*rc": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
   "min.*": {filename: {foreground: "#4C566A"}, icon: {style: {foreground: "#4C566A"}}}
   "test.*": {filename: {foreground: "#A3BE8C"}, icon: {style: {foreground: "#A3BE8C"}}}
   "spec.*": {filename: {foreground: "#A3BE8C"}, icon: {style: {foreground: "#A3BE8C"}}}
   "config.*": {filename: {foreground: "#5E81AC"}, icon: {style: {foreground: "#5E81AC"}}}
 
+
   # --- SPECIAL DIRS ---
+
   "node_modules": {filename: {foreground: "#4C566A", is_dimmed: true, is_bold: true}, icon: {style: {foreground: "#4C566A"}}}
   "target": {filename: {foreground: "#4C566A", is_bold: true}, icon: {style: {foreground: "#4C566A"}}}
   "dist": {filename: {foreground: "#4C566A", is_bold: true}, icon: {style: {foreground: "#4C566A"}}}
@@ -151,6 +162,7 @@ filenames:
   
 extensions:
   # --- PROGRAMMING ---
+
   # Rust
   "rs": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}
   "toml": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
@@ -200,7 +212,9 @@ extensions:
   # Nix
   "nix": {filename: {foreground: "#81A1C1"}, icon: {style: {foreground: "#81A1C1"}}}
   
+
   # --- WEB ---
+
   # Layouts
   "html": {filename: {foreground: "#B48EAD"}, icon: {style: {foreground: "#B48EAD"}}}
   "htm": {filename: {foreground: "#B48EAD"}, icon: {style: {foreground: "#B48EAD"}}}
@@ -230,7 +244,9 @@ extensions:
   "db": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   "sqlite": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   
+
   # --- SCRIPTS ---
+
   "sh": {filename: {foreground: "#A3BE8C"}, icon: {style: {foreground: "#A3BE8C"}}}
   "bash": {filename: {foreground: "#A3BE8C"}, icon: {style: {foreground: "#A3BE8C"}}}
   "zsh": {filename: {foreground: "#A3BE8C"}, icon: {style: {foreground: "#A3BE8C"}}}
@@ -246,7 +262,9 @@ extensions:
   "vimrc": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
   "r": {filename: {foreground: "#88C0D0"}, icon: {style: {foreground: "#88C0D0"}}}
 
+
   # --- DOCUMENTS ---
+
   "md": {filename: {foreground: "#D8DEE9"}, icon: {style: {foreground: "#D8DEE9"}}}
   "rst": {filename: {foreground: "#D8DEE9"}, icon: {style: {foreground: "#D8DEE9"}}}
   "txt": {filename: {foreground: "#D8DEE9"}, icon: {style: {foreground: "#D8DEE9"}}}
@@ -260,7 +278,9 @@ extensions:
   "docx": {filename: {foreground: "#D8DEE9"}, icon: {style: {foreground: "#D8DEE9"}}}
   "rtf": {filename: {foreground: "#D8DEE9"}, icon: {style: {foreground: "#D8DEE9"}}}
 
+
   # --- MEDIA ---
+
   # Images
   "png": {filename: {foreground: "#D08770"}, icon: {style: {foreground: "#D08770"}}}
   "jpg": {filename: {foreground: "#D08770"}, icon: {style: {foreground: "#D08770"}}}
@@ -290,7 +310,9 @@ extensions:
   "aac": {filename: {foreground: "#D08770"}, icon: {style: {foreground: "#D08770"}}}
   "wma": {filename: {foreground: "#D08770"}, icon: {style: {foreground: "#D08770"}}}
 
+
   # --- ARCHIVES ---
+
   "zip": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}
   "tar": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}
   "gz": {filename: {foreground: "#BF616A"}, icon: {style: {foreground: "#BF616A"}}}

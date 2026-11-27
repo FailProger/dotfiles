@@ -1,58 +1,73 @@
 software-installer
----
+==================
 
 A small installer for user software and configs on Debian/Ubuntu.
 The target platform is Ubuntu LTS 24.04 (amd64); package names use the 24.04
 variants, other distributions are not covered.
+
 It installs only the requested modules and their runtime dependencies, removes
 temporary build dependencies after a successful run, and can keep them for
-later builds with `--keep-build-deps`. It can show a plan, continue after a
-failure, and run again safely.
+later builds with `--keep-build-deps`. Programs installed by the installer can
+later be removed independently from their configuration.
 
 ## Quick start
 
 ```bash
 ./installer.sh -h
-./installer.sh -l                      # list all modules
-./installer.sh -n all                  # show the plan, change nothing
-./installer.sh -n -v all               # detailed plan: phases and packages
-./installer.sh -y zsh                  # install one module
-./installer.sh binwalk alacritty       # install several modules
-./installer.sh cli                     # all modules in a category
-./installer.sh user-software           # all modules in a group
-./installer.sh all                     # all modules
-./installer.sh -m git                  # mark a module as installed
-./installer.sh --keep-build-deps -y dwm  # keep build deps for a later build
-./installer.sh $(cat lists/xorg-dwm-base.list | xargs)  # use lists
+./installer.sh list
+./installer.sh -d install all                  # show the plan, change nothing
+./installer.sh -d -v install all               # detailed plan
+./installer.sh install zsh                     # install one module
+./installer.sh install binwalk alacritty       # install several modules
+./installer.sh install cli                     # all modules in a category
+./installer.sh install user-software           # all modules in a group
+./installer.sh install all                     # all modules
+./installer.sh configure zsh                   # run only __configure
+./installer.sh reinstall zsh                   # force install + configure
+./installer.sh remove zsh                      # remove the program, keep config
+./installer.sh deconfigure zsh                 # remove config, keep the program
+./installer.sh remove --deconfigure zsh        # remove both
+./installer.sh --keep-build-deps install dwm   # keep build deps for later
+./installer.sh install $(cat lists/xorg-dwm-base.list | xargs)  # use lists
 ```
 
-`-l` prints modules grouped by folder with an install status marker:
-`✓` (green) means the install phase is already recorded, `○` (dim) means the
-module is not installed. You can pass any name from the list to the installer.
+`list` prints modules grouped by folder with an install status marker:
+`✓` (green) means the program is installed (recorded or detected), `○` (dim)
+means it is not installed. You can pass any name from the list to the installer.
 
 The first folder under `modules/software` is a group (`user-software`,
 `system-setup`). A folder inside a group is a category (`cli`, `desktop`,
-`infosec`, ...). A target is what you ask the installer to install: a group
+`infosec`, ...). A target is what you ask the installer to work on: a group
 name, a category name, or one module.
 
 Main options:
 
 ```text
 -h, --help            show help
--l, --list            list all modules
+-d, --dry-run         show the plan and exit
 -y, --yes             do not ask for confirmation
--n, --dry-run         show the plan and exit
 -v, --verbose         detailed plan: phase matrix, package versions, descriptions
-                      (short options can be combined: -vn = -v -n)
     --color WHEN      color mode: auto, always or never (default: auto)
-    --install-only    dependencies + __install
-    --configure-only  only __configure
--f, --force           run phases again, ignore saved state
--r, --reset           remove saved state for the selected modules and exit
--m, --mark-installed  mark selected modules as installed and exit
     --keep-going      continue after errors
-    --keep-build-deps keep build dependencies and build-only modules
-    --force-clean     run autoremove even after a module failure
+```
+
+Install/reinstall options:
+
+```text
+--keep-build-deps     keep build dependencies and build-only modules
+--force-clean         run autoremove even after a module failure
+```
+
+Install option:
+
+```text
+--no-configure        install the program only; do not run __configure
+```
+
+Remove option:
+
+```text
+--deconfigure         also run __deconfigure after a successful __remove
 ```
 
 Installation always runs for the user who started the script. Root is needed
@@ -62,7 +77,7 @@ needed. Modules that only write to the home directory (for example
 do.
 
 ```bash
-sudo ./installer.sh -y zsh
+sudo ./installer.sh install zsh
 ```
 
 means installation **for root** (configs in `/root`, `chsh` for root). It does
@@ -76,6 +91,7 @@ Global settings are in `config.sh` next to `installer.sh`:
 - `SOFTWARE_DIR` — folder with modules;
 - `CONFIG_DIR` — folder with configs that modules copy;
 - `LOCAL_DIR` — folder with local repository data;
+- `PATCHES_DIR` - folder with patches for programs;
 - `UI_COLOR` — color mode: `auto`, `always` or `never`;
 - `LIB_DOWNLOAD__ATTEMPTS`, `LIB_DOWNLOAD__*_TIMEOUT` — download retries and
   timeouts;
@@ -84,28 +100,40 @@ Global settings are in `config.sh` next to `installer.sh`:
 You can edit the file or override values for one run:
 
 ```bash
-CONFIG_DIR=/srv/dotfiles ./installer.sh -n zsh
+CONFIG_DIR=/srv/dotfiles ./installer.sh -d install zsh
 ```
 
-## Manual install marks
+## Installed state, external programs and adoption
 
-If a program is already installed outside the installer, mark its module as
-installed. The installer will not run its install phase again:
+The installer keeps a small state database per module:
 
-```bash
-./installer.sh -m git
-./installer.sh -n dwm      # the git module is already done
-```
+- `install.done` — the program was installed by the installer;
+- `configure.done` — configuration was applied;
+- `manual` — the module was explicitly requested and must not be removed by an
+  automatic orphan sweep (like `apt manual`);
+- `external` — the program already existed before the installer ran and is not
+  managed by it.
 
-`-m` writes `install.done` with the current module fingerprint and a
-`manual.mark`. The mark protects the module from `__remove` even if another
-module uses it as a build-only dependency. It does not touch
-`configure.done`: if you request that module explicitly later, its configure
-phase can still run. An explicit install request clears `manual.mark`.
+A program is **managed** when `install.done` exists and `external` does not.
+Only managed programs can be removed by `remove`.
 
-Use `-n -m git` to preview. Use `-r git` to remove the mark. If the module file
-changes, its fingerprint changes and the module will run again; mark it again
-after the change.
+If a program is already present outside the installer, `install` detects it
+through the module's `__is_installed` hook, records `external`, skips
+`__install`, and can still run `__configure`. Such a program is never removed
+automatically.
+
+To take an external program under management, run `reinstall`. It explicitly
+reruns `__install` and `__configure`; on success `external` is removed and the
+module becomes managed. After that `remove` can remove it.
+
+An explicit `install` of a module marks it `manual`, even when the install phase
+was already done. This is how you pin a dependency: install it explicitly once,
+and a later `remove` of its parent will not sweep it away. `reinstall` is the
+explicit way to run the install and configure phases again.
+
+Existing installs from the old state format are marked `manual` on the first
+run after the upgrade. This is deliberate: no old module is swept away by the
+new orphan logic before the user has a chance to review it.
 
 ## Non-interactive installs
 
@@ -120,43 +148,94 @@ sudo dpkg-reconfigure wireshark-common
 
 Modules must not ask questions or wait for input.
 
+## Remove and deconfigure
+
+The two operations are independent:
+
+```text
+__install     <->  __remove        program
+__configure   <->  __deconfigure   configuration
+```
+
+- `remove` calls only `__remove`: the program disappears, configuration stays.
+- `deconfigure` calls only `__deconfigure`: configuration disappears, the
+  program stays.
+- `remove --deconfigure` runs both.
+
+This means a module can be left in three useful states:
+
+- program installed, configuration removed — the user can configure it by hand;
+- program removed, configuration kept — a later install reuses the settings;
+- neither.
+
+If a program cannot run without `__configure`, the module is wrong:
+`__install` must leave a runnable program, and `__configure` must only add
+convenience or customization. For example, `dirsearch__install` leaves a
+runnable `/opt/dirsearch`, while `dirsearch__configure` adds the convenient
+`/usr/local/bin/dirsearch` wrapper. `remove` removes `/opt/dirsearch`;
+`deconfigure` removes the wrapper.
+
+The same rule applies to symlinks and wrappers: whatever `__install` creates
+belongs to `__remove`, whatever `__configure` creates belongs to
+`__deconfigure`.
+
+`remove` refuses to touch an `external` program. It also refuses to remove a
+module that another installed module depends on at runtime, and prints which
+module to remove first.
+
+`remove --deconfigure` checks the program part first. If the program cannot be
+removed, the whole command is refused and configuration is left untouched. Use
+`deconfigure` alone when you only want to remove configuration.
+
+After a successful `remove`, the installer sweeps orphan dependency modules:
+managed modules that are not `manual`, not `external`, and are not reachable
+from any installed `manual`/`external` module. Configuration of swept modules is
+kept. `deconfigure` never triggers this sweep because the program stays
+installed.
+
+`remove` and `deconfigure` remove module artifacts, not apt dependencies.
+Runtime apt packages stay protected as `manual`; build packages are handled by
+the existing `autoremove` step after a build.
+
 ## How it works
 
 ```text
 installer.sh
   └─ modules/command.sh       command line, environment, plan, confirmation
-       └─ modules/orchestrator.sh   roles, dependencies, phases, cleanup, state
-            ├─ lib/state.sh     phase markers, fingerprint, lock, logs, pending cleanup
+       └─ modules/orchestrator.sh   roles, dependencies, phases, removal, state
+            ├─ lib/state.sh     phase markers, fingerprint, lock, logs, runner
             ├─ lib/apt.sh       package metadata, batch install, auto-mark, autoremove
             ├─ lib/manifest.sh  JSON run manifest
             ├─ lib/root.sh      sudo when needed
             └─ lib/*            files, binaries, output
 ```
 
-1. `command.sh` reads the arguments, sets `HOME`/`USER` for the current user,
-   finds modules and asks the orchestrator to build a plan.
+1. `command.sh` reads the subcommand and options, sets `HOME`/`USER` for the
+   current user, finds modules and asks the orchestrator to build a plan.
 2. The orchestrator collects modules and classifies each dependency as
    `build` or `runtime`. Module dependencies are resolved recursively and get
-   a role: `requested`, `runtime` or `build`. A build-only module is used only
-   when a module that actually installs in this run depends on it; otherwise
-   it is left untouched.
+   a role: `requested`, `runtime` or `build`.
 3. All apt dependencies of the run are installed in one batch. Runtime
-   dependencies become `manual` immediately (including ones that were already
-   installed as `auto`); build dependencies are marked `auto` and are
-   removable.
-4. Each module runs in phases:
-   - `install` → `module__install`;
-   - `configure` → `module__configure`.
-5. After a successful run, build-only modules get `module__remove`, then
+   dependencies become `manual` immediately; build dependencies are marked
+   `auto` and are removable.
+4. Each install/configure phase runs in a clean subshell with `set -eE -o
+   pipefail`. The first failed command aborts the phase. Output is streamed to
+   the terminal and appended to the phase log. The runner prints one error line
+   with the module file, line and failing command. Modules do not need their own
+   subshell for error handling; a nested `( ... )` is only for local `cwd` or
+   variable isolation.
+5. Before `__install`, the orchestrator calls `__is_installed`. If the program
+   is already present and this is not `reinstall`, it records `external` and
+   skips `__install`.
+6. After a successful run, build-only modules get `__remove`, then
    `apt autoremove --purge` removes build packages that are no longer needed.
-6. The result of each phase is saved in the state. The next run skips `done`
+7. The result of each phase is saved in the state. The next run skips `done`
    phases and continues from a failed phase.
-7. If a module file changes, its saved fingerprint (a hash of the file) no
-   longer matches, so the phases of that module run again.
+8. If a module file changes, its saved fingerprint no longer matches, so the
+   phases of that module run again.
 
-`--keep-build-deps` disables both `module__remove` and `apt autoremove`, so
-build dependencies are not marked `auto` and are not removed. Dependencies
-installed by this run stay `manual` and can be reused for a later build.
+`--keep-build-deps` disables both build-only `__remove` and `apt autoremove`,
+and marks the build-only modules `manual`, so a later orphan sweep keeps them.
 
 Saved progress (state) is stored in:
 
@@ -164,6 +243,7 @@ Saved progress (state) is stored in:
 ${XDG_STATE_HOME:-$HOME/.local/state}/software-installer/
 ├── lock
 ├── cleanup.pending
+├── migration.v2
 ├── manifests/
 │   └── 20260101T120000Z.XXXXXX/
 │       ├── manifest.json
@@ -174,21 +254,25 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/software-installer/
 └── modules/
     └── user-software__cli__zsh/
         ├── fingerprint
-        ├── manual.mark
-        ├── owned
+        ├── manual
+        ├── external
         ├── install.done
         ├── configure.done
         ├── install.failed
         ├── configure.failed
+        ├── remove.failed
+        ├── deconfigure.failed
         ├── install.running
         ├── configure.running
         ├── install.log
-        └── configure.log
+        ├── configure.log
+        ├── remove.log
+        └── deconfigure.log
 ```
 
-Phase logs are also printed to the terminal. `manual.mark` is written by
-`-m/--mark-installed` and protects a module from `__remove`. `owned` is an
-optional marker used by modules that may already exist before installation.
+`manual` is written by an explicit `install`/`reinstall` or by
+`--keep-build-deps`. `external` is written when `__is_installed` reports a
+pre-existing program. Phase logs are also printed to the terminal.
 
 ## Project structure
 
@@ -229,7 +313,7 @@ lib/
 One module is one file:
 
 ```text
-modules/software/user-software/<category>/<name>.sh
+modules/software/<class>/<category>/<name>.sh
 ```
 
 For example:
@@ -239,17 +323,16 @@ modules/software/user-software/cli/rg.sh
 ```
 
 The file name sets the function prefix: `rg.sh` →
-`rg__get_build_dependencies`, `rg__get_runtime_dependencies`, `rg__install`,
-`rg__configure`, and optionally `rg__remove`.
+`rg__get_build_dependencies`, `rg__get_runtime_dependencies`,
+`rg__is_installed`, `rg__install`, `rg__configure`, `rg__remove`,
+`rg__deconfigure`.
 
 File names must be unique under `modules/software`. If two modules have the
 same name, the installer reports an error.
 
 ### 2. Required contract
 
-Every module must follow this contract. The first four functions are required;
-`__remove` is required for every module that can be used as a build-only
-dependency.
+Every module must implement all functions:
 
 ```bash
 name__get_build_dependencies() {
@@ -266,6 +349,10 @@ name__get_runtime_dependencies() {
   echo "$deps"
 }
 
+name__is_installed() {
+  # Return 0 when the program installed by __install is already present.
+}
+
 name__install() {
   # install the main program
 }
@@ -275,23 +362,35 @@ name__configure() {
 }
 
 name__remove() {
-  # fully undo __install and __configure
+  # remove only what __install created
+}
+
+name__deconfigure() {
+  # remove only what __configure created
 }
 ```
+
+Rules:
 
 - `__get_build_dependencies` — packages/modules needed only for the build;
 - `__get_runtime_dependencies` — packages/modules needed after installation;
   they are never removed automatically;
-- `__install` — install the main program only;
-- `__configure` — configuration only, no package installation;
-- `__remove` — remove binaries, generated files, cache and configs created by
-  the module. It must be safe to run twice and must not delete something that
-  existed before the module was installed. If it decides to keep a pre-existing
-  program, it calls `lib__state_mark_kept` so the manifest reports it as kept,
-  not removed.
-- `__is_installed` (optional) — return 0 when the module's program is already
-  present. A build-only module with this hook is treated as provided by the
-  user: it is not reinstalled and not scheduled for cleanup.
+- `__is_installed` — a read-only predicate for the program installed by
+  `__install`. It must not write state or install anything;
+- `__install` — install the main program only. After it, the program must be
+  runnable without `__configure`;
+- `__configure` — configuration and convenience only. It must be safe to skip;
+- `__remove` — remove only install artifacts: binaries, `/opt/<name>`, files
+  generated by `__install`. It must not remove configuration;
+- `__deconfigure` — remove only configure artifacts: config files, wrappers,
+  symlinks or desktop files created by `__configure`. It must not remove the
+  program.
+
+`__remove` and `__deconfigure` must be idempotent: running them twice must not
+fail, and a missing file is not an error. They must work independently:
+
+- `__remove` works even when no configuration exists;
+- `__deconfigure` works even when the program is already removed.
 
 An old `__get_dependencies` is still accepted as a deprecated alias. Its result
 is treated as both build and runtime, so those dependencies are never removed
@@ -300,7 +399,87 @@ automatically.
 Modules must not ask questions or read stdin. All phases run with
 `/dev/null` as stdin.
 
-### 3. Dependencies
+### 3. Error handling and logs
+
+Do not put `||` after every command. The phase runner already runs the module
+with `set -e`, so the first failed command aborts the phase and the runner
+prints one line like:
+
+```text
+[ERROR] picom: install failed: picom.sh:91: ninja -C build
+```
+
+Use `|| true` or an `if` only for a command that may legitimately fail:
+
+```bash
+grep -q 'something' file || true
+```
+
+Do not wrap a whole build in `if ! ( ... )`: that disables `set -e` inside the
+subshell and hides the first failure. The phase runner already runs the module
+in a subshell, so write a plain sequence of commands:
+
+```bash
+name__install() {
+  local workdir
+
+  workdir="$(lib__tmpdir)"
+  cd "$workdir"
+
+  git clone --depth 1 'https://github.com/org/name'
+  cd name
+
+  make
+  lib__as_root make install
+}
+```
+
+`lib__tmpdir` creates a directory under the phase root; the runner removes it
+when the phase finishes, successfully or not.
+
+A nested subshell is not required for error handling, but it is not forbidden.
+A plain `( ... )` is a normal command and inherits `set -e`. Use it when you
+need to change `cwd` locally and return to the previous directory afterwards:
+
+```bash
+name__install() {
+  (
+    cd /some/dir
+    make
+  )
+
+  # cwd is unchanged here
+  install -m 755 /some/dir/bin/name /usr/local/bin/name
+}
+```
+
+If the rest of the phase works in the new directory, a plain `cd` is enough,
+because the phase itself is already isolated. When a command accepts a
+directory argument, prefer it over `cd`. For example, this:
+
+```bash
+lib__as_root cp -r "$conf_dir/Topping" "$work_dir"/
+lib__as_root patch -d "$work_dir" -p1 < "$conf_dir/USB-Audio.conf.diff"
+```
+
+is equivalent to the `( cd "$work_dir"; patch -p1 ... )` form and keeps the
+paths explicit. This is the reason `topping_ucm__configure` does not need its
+own subshell: `patch -d` and explicit `cp` destinations say the same thing more
+directly. Do not add `set -e` inside the module: the runner already sets it.
+
+Do not use `local x="$(cmd)"` when `cmd` can fail: `local` hides its exit
+status. Declare and assign separately:
+
+```bash
+local x
+x="$(cmd)"
+```
+
+`lib__log_info`, `lib__log_warn` and `lib__log_error` from a module still appear
+on the terminal and in the phase log. The runner adds the final error line; do
+not duplicate build-failure messages.
+
+### 4. Dependencies
 
 The dependency functions are declarations, not installations.
 
@@ -329,9 +508,9 @@ Each entry is resolved in this order:
 2. Otherwise the entry is an apt package name.
 
 For example, `alacritty` declares `rust` and `git` as build dependencies, so
-`./installer.sh alacritty` installs those modules for the build. Since they are
-build-only, the orchestrator calls their `__remove` after alacritty is built.
-Runtime libraries such as `libfontconfig1` stay installed.
+`./installer.sh install alacritty` installs those modules for the build. Since
+they are build-only, the orchestrator calls their `__remove` after alacritty is
+built. Runtime libraries such as `libfontconfig1` stay installed.
 
 Roles are computed from the graph:
 
@@ -339,8 +518,7 @@ Roles are computed from the graph:
 - a runtime edge makes a module `runtime`;
 - a build edge makes a module `build`;
 - everything reachable from a `build` module is also `build`;
-- if a module is reachable both ways, `runtime` wins;
-- a `build` module without `__remove` is promoted to `runtime`.
+- if a module is reachable both ways, `runtime` wins.
 
 Rules:
 
@@ -349,8 +527,9 @@ Rules:
 - module dependencies are installed before the module that needs them;
 - module dependencies run `__install` only, without `__configure`, unless they
   are explicitly requested;
-- a module you ask for explicitly always runs all phases for the selected mode;
-- with `--configure-only`, module dependencies are not added;
+- a module you ask for explicitly always runs the phases for the selected
+  command;
+- with `configure`, module dependencies are not added;
 - dependency cycles are an error;
 - do not list the runtime desktop environment: Xorg, fonts, dmenu, terminals,
   panels, compositors, wallpaper and lock tools;
@@ -361,11 +540,9 @@ Rules:
   `lib__wget_download` with an HTTPS URL;
 - declare `unzip`/`xz-utils`/`bzip2` in build dependencies if you use the
   corresponding archive format with `lib__mv_to_local_bin`;
-- for builds, list the smallest package set, not `build-essential`;
-- if the program may already exist on the machine, write an ownership marker
-  with `lib__state_mark_owned` and check it in `__remove`.
+- for builds, list the smallest package set, not `build-essential`.
 
-### 4. Install
+### 5. Install
 
 `__install` must be idempotent (safe to run again): a second run must not break
 anything and must not create duplicates.
@@ -373,7 +550,7 @@ anything and must not create duplicates.
 Main techniques:
 
 - check what is already installed;
-- build in `mktemp -d`;
+- build in `lib__tmpdir`;
 - remove only folders you manage (`/opt/<name>`);
 - use `mkdir -p`, `ln -sf`, `install -m`, `mv -f`;
 - do not clone into an existing folder without cleaning it;
@@ -382,14 +559,26 @@ Main techniques:
 The main program installed by apt:
 
 ```bash
+rg__is_installed() {
+  lib__apt_is_installed ripgrep
+}
+
 rg__install() {
   lib__apt_install ripgrep
+}
+
+rg__remove() {
+  lib__apt_remove ripgrep
 }
 ```
 
 Example: a binary in an archive from GitHub Releases.
 
 ```bash
+name__is_installed() {
+  command -v name > /dev/null 2>&1
+}
+
 name__get_build_dependencies() {
   local deps='
   wget
@@ -430,54 +619,25 @@ name__install() {
 Example: build from source.
 
 ```bash
-name__get_build_dependencies() {
-  local deps='
-  git
-  make
-  gcc
-  '
-  echo "$deps"
-}
-
-name__get_runtime_dependencies() {
-  local deps='
-  libexample1
-  '
-  echo "$deps"
-}
-
 name__install() {
   local workdir
 
-  workdir="$(mktemp -d)"
+  workdir="$(lib__tmpdir)"
+  cd "$workdir"
 
-  (
-    cd "$workdir"
-    git clone --depth 1 'https://github.com/org/name'
-    cd name
-    make
-    lib__as_root make install
-  )
+  git clone --depth 1 'https://github.com/org/name'
+  cd name
+  make
+  lib__as_root make install
+}
 
-  rm -rf "$workdir"
+name__remove() {
+  lib__as_root rm -f /usr/local/bin/name
 }
 ```
 
 List the runtime libraries the built binary links to. If you omit them, the
 global `autoremove` can remove them after the build dependencies are deleted.
-
-Example: install a `.deb` from GitHub Releases.
-
-```bash
-name__install() {
-  rm -f ./name_*.deb
-
-  lib__wget_download_github_release 'org/name' 'name_.*_amd64.deb'
-  lib__apt_install ./name_*.deb
-
-  rm -f ./name_*.deb
-}
-```
 
 Example: a managed folder in `/opt`.
 
@@ -495,9 +655,13 @@ name__install() {
 
   rm -f 'name.tar.xz'
 }
+
+name__remove() {
+  lib__as_root rm -rf /opt/name
+}
 ```
 
-### 5. Configuration
+### 6. Configuration
 
 `__configure` handles only configs and must also be idempotent (safe to run
 again).
@@ -507,6 +671,10 @@ A ready config from the repository `config/` folder:
 ```bash
 name__configure() {
   lib__cp_config 'name'
+}
+
+name__deconfigure() {
+  rm -rf "$HOME/.config/name"
 }
 ```
 
@@ -531,6 +699,10 @@ name__configure() {
 user=$USER
 EOF
 }
+
+name__deconfigure() {
+  rm -f "$HOME/.config/name/config.conf"
+}
 ```
 
 Writing to `/etc` and `/usr/local/share` also uses `lib__file_write`:
@@ -547,7 +719,31 @@ name__configure() {
 }
 ```
 
-### 6. Root access and user
+### 7. Remove and deconfigure
+
+```bash
+name__remove() {
+  lib__as_root rm -f /usr/local/bin/name
+}
+
+name__deconfigure() {
+  rm -rf "$HOME/.config/name"
+}
+```
+
+For a main program installed by apt:
+
+```bash
+name__remove() {
+  lib__apt_remove name
+}
+```
+
+`lib__apt_remove` refuses to purge a package that other installed packages
+depend on. In that case it returns 3 and the phase runner reports the module as
+kept instead of removed. The module does not write any state.
+
+### 8. Root access and user
 
 Module code always runs as the current user. The installer sets `HOME` and
 `USER` for this user, so you can use them directly.
@@ -567,23 +763,8 @@ lib__apt_install ripgrep fd-find
 ```
 
 In `__remove`, use `lib__apt_remove` for a main program that the module
-installed itself. Check ownership first so a pre-existing package is kept.
-`lib__apt_remove` also refuses to purge a package that other installed
-packages depend on and marks the module as kept:
-
-```bash
-git__remove() {
-  lib__state_is_owned || {
-    lib__state_mark_kept
-    return 0
-  }
-
-  lib__apt_remove git
-}
-```
-
-`lib__as_root` asks for the sudo password only on the first call.
-If a module does not need root, no password is asked.
+installed itself. Do not check ownership in the module: the orchestrator
+already skips `external` and blocked programs.
 
 Do not:
 
@@ -593,9 +774,11 @@ Do not:
 | `sudo -u ...` | not needed: code already runs as the user |
 | `chown ...` | not needed: files are created by the user |
 | `apt-get install ...` | `lib__apt_install ...` |
-| `apt-get purge ...` | `lib__apt_remove ...` (with an ownership check) |
+| `apt-get purge ...` | `lib__apt_remove ...` |
+| `mktemp -d` for build work | `lib__tmpdir` |
+| writing ownership/kept markers in a module | nothing: ownership is orchestrator state |
 
-### 7. Available variables
+### 9. Available variables
 
 - `SCRIPT_DIR` — project root;
 - `SOFTWARE_DIR` — `modules/software`;
@@ -606,13 +789,14 @@ Do not:
 - `STATE_ROOT` — state folder;
 - `MODULE_STATE_DIR` — state folder of the current module phase;
 - `MODULE_KEY` — state key of the current module;
-- `MODULE_NAME` — current module name during `__remove`.
+- `MODULE_NAME` — current module name during a phase.
 
-### 8. Library helpers
+### 10. Library helpers
 
 ```text
 lib__as_root <command...>
 
+lib__tmpdir                           # per-phase temporary directory
 lib__file_write <path> [mode]         # content from stdin, sudo if needed
 lib__cp_config <file> [exact path]    # keeps modes and exec bit
 
@@ -634,13 +818,10 @@ lib__apt_run <apt-get or dpkg command...>   # always non-interactive
 lib__apt_update [--force]                   # --force after adding a repository
 
 lib__require_command <command> [package]
-lib__state_mark_owned
-lib__state_is_owned
-lib__state_mark_kept        # __remove kept a pre-existing program
 lib__log_info|warn|error|success <text>
 ```
 
-### 9. Full template
+### 11. Full template
 
 ```bash
 name__get_build_dependencies() {
@@ -658,18 +839,20 @@ name__get_runtime_dependencies() {
   echo "$deps"
 }
 
+name__is_installed() {
+  command -v name > /dev/null 2>&1
+}
+
 name__install() {
   local workdir
 
-  lib__wget_download 'https://example.com/name.tar.gz'
-  lib__mv_to_local_bin 'name'
+  workdir="$(lib__tmpdir)"
+  cd "$workdir"
 
-  workdir="$(mktemp -d)"
-  (
-    cd "$workdir"
-    # build and install if needed
-  )
-  rm -rf "$workdir"
+  git clone --depth 1 'https://github.com/org/name'
+  cd name
+  make
+  lib__as_root make install
 }
 
 name__configure() {
@@ -678,31 +861,35 @@ name__configure() {
 
 name__remove() {
   lib__as_root rm -f /usr/local/bin/name
+}
+
+name__deconfigure() {
   rm -rf "$HOME/.config/name"
 }
 ```
 
-### 10. Checklist
+### 12. Checklist
 
 Before adding a module, check:
 
 - [ ] the file is in `modules/software/<group>/<category>/`;
 - [ ] the file name is unique;
-- [ ] `__get_build_dependencies`, `__get_runtime_dependencies`, `__install` and
-      `__configure` exist and have the correct prefix;
-- [ ] `__remove` exists if the module can be used as a build-only dependency;
+- [ ] `__get_build_dependencies`, `__get_runtime_dependencies`,
+      `__is_installed`, `__install`, `__configure`, `__remove` and
+      `__deconfigure` exist and have the correct prefix;
 - [ ] build and runtime dependencies are separated correctly;
 - [ ] dependency functions have no side effects, no main program, and no
       runtime desktop environment;
-- [ ] `__install` is idempotent (safe to run twice);
-- [ ] `__remove` is idempotent and checks the ownership marker if the program
-      may already exist;
+- [ ] `__install` is idempotent and leaves a runnable program without
+      `__configure`;
+- [ ] `__remove` is idempotent and removes only install artifacts;
+- [ ] `__deconfigure` is idempotent and removes only configure artifacts;
 - [ ] there is no plain `sudo`;
 - [ ] apt packages use `lib__apt_install` or `lib__apt_remove`;
 - [ ] tools such as `wget`, `ca-certificates`, `unzip`, `xz-utils`, `bzip2` are
       declared in build dependencies;
 - [ ] the module does not ask questions or read stdin;
-- [ ] temporary files are removed;
+- [ ] temporary files are removed; build work uses `lib__tmpdir`;
 - [ ] configs use `lib__cp_config` or `lib__file_write`;
 - [ ] the installer runs twice in a row without errors.
 
@@ -710,12 +897,15 @@ Check:
 
 ```bash
 bash -n modules/software/user-software/<category>/name.sh
-./installer.sh -n name
-./installer.sh -n -v name          # full phase and package matrix
-./installer.sh -y name
-./installer.sh -y name             # the second run must skip phases
-./installer.sh -y --force name     # must run without duplicates
-./installer.sh -y --keep-build-deps name  # build deps stay manual
+./installer.sh -d install name
+./installer.sh -d -v install name      # full phase and package matrix
+./installer.sh -y install name
+./installer.sh -y install name         # the second run must skip phases
+./installer.sh -y reinstall name       # must run without duplicates
+./installer.sh -y --keep-build-deps install name  # build deps stay manual
+./installer.sh -y deconfigure name     # program must still run
+./installer.sh -y remove name          # program removed, config kept
+./installer.sh -y remove --deconfigure name
 ```
 
 ## Common errors
@@ -731,11 +921,21 @@ bash -n modules/software/user-software/<category>/name.sh
   must exist. Return 0 from the empty one.
 - **`Circular module dependency`** — modules point to each other via
   dependency functions; break the cycle.
-- **A build-only module was not removed** — it has no `__remove`, was marked
-  with `-m`, was already present before the run, or another installed package
-  depends on it. It is kept on purpose.
+- **A build-only module was not removed** — it was marked `manual`, was already
+  present before the run, or another installed package depends on it. It is
+  kept on purpose.
 - **Build dependencies stayed installed** — `--keep-build-deps` was used, or a
   module failed and `--force-clean` was not passed.
+- **`remove` says the module is installed outside the installer** — the program
+  is `external`. Run `deconfigure` to remove only its configuration, or
+  `reinstall` to adopt it, then `remove`.
+- **A failed install left partial files** — run `remove` for that module. A
+  recorded failed install attempt is treated as removable even if
+  `__is_installed` now sees a partial program.
+- **`remove` says another module needs this one** — remove the dependent module
+  first. There is no recursive cascade.
+- **`deconfigure` says nothing to do** — the module has no recorded
+  configuration; `configure.done` is absent.
 - **`autoremove` wants to remove unrelated packages** — this is the global
   autoremove behavior; use `--keep-build-deps` to skip it, or inspect the
   manifest and `autoremove_preview` first.
@@ -744,6 +944,6 @@ bash -n modules/software/user-software/<category>/name.sh
 - **apt or dpkg asked a question** — the installer runs them non-interactively.
   If a package needs a choice, use `sudo dpkg-reconfigure <package>` after the
   installation.
-- **A phase is skipped but you need to reinstall** — use `--force` or `--reset`.
+- **A phase is skipped but you need to reinstall** — use `reinstall`.
 - **A config did not update** — config changes do not affect the fingerprint;
-  use `--force`.
+  use `configure` or `reinstall`.

@@ -18,7 +18,7 @@ dirsearch__install() {
   local ds_dir='/opt/dirsearch'
   local workdir
 
-  workdir="$(mktemp -d)"
+  workdir="$(lib__tmpdir)"
 
   (
     cd "$workdir"
@@ -35,8 +35,6 @@ dirsearch__install() {
   lib__as_root rm -rf "$ds_dir"
   lib__as_root mkdir -p /opt
   lib__as_root cp -rf "$workdir/dirsearch-src" "$ds_dir"
-
-  rm -rf "$workdir"
 }
 
 dirsearch__configure() {
@@ -49,4 +47,16 @@ dirsearch__configure() {
 # It is a link to start dirsearch with python env.
 $ds_dir/.venv/bin/python $ds_dir/dirsearch.py \$@
 EOF
+}
+
+dirsearch__is_installed() {
+  [[ -f /opt/dirsearch/dirsearch.py ]]
+}
+
+dirsearch__remove() {
+  lib__as_root rm -rf /opt/dirsearch
+}
+
+dirsearch__deconfigure() {
+  lib__as_root rm -f /usr/local/bin/dirsearch
 }

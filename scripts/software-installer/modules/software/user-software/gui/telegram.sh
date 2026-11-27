@@ -37,3 +37,16 @@ telegram__install() {
 telegram__configure() {
   return 0
 }
+
+telegram__is_installed() {
+  [[ -x /opt/telegram/Telegram ]]
+}
+
+telegram__remove() {
+  lib__as_root rm -rf /opt/telegram
+  lib__as_root rm -f /usr/local/bin/telegram
+}
+
+telegram__deconfigure() {
+  return 0
+}

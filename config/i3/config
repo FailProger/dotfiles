@@ -1,8 +1,11 @@
 # --- VARIABLES ---
+
 # Mod key
 set $mod Mod4
 
+
 # --- VISUAL ---
+
 # Font for window titles
 font pango:Hack Nerd Fonts 8
 
@@ -12,7 +15,9 @@ default_border pixel 0
 # Gaps betten windows
 gaps inner 5
 
+
 # --- BINDS ---
+
 # Use pactl to adjust volume in PulseAudio.
 set $refresh_i3status killall -SIGUSR1 i3status
 bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +10% && $refresh_i3status
@@ -72,7 +77,9 @@ bindsym $mod+Shift+r restart
 # Exit i3 (logs you out of your X session)
 bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -B 'Yes, exit i3' 'i3-msg exit'"
 
+
 # --- MODS ---
+
 # Resize window (you can also use the mouse for that)
 mode "resize" {
         # These bindings trigger as soon as you enter the resize mode
@@ -94,7 +101,9 @@ mode "resize" {
 
 bindsym $mod+r mode "resize"
 
+
 # --- AUTOSTART ---
+
 # X11 settings
 exec_always --no-startup-id xset r rate 200 45
 exec_always --no-startup-id setxkbmap -layout 'us,ru' -variant ',typo' -option 'grp:toggle,lv3:caps_switch'

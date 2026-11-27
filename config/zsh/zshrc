@@ -13,10 +13,14 @@ main() {
     (( ${+_comps} )) && _comps[zinit]=_zinit
     # End of Zinit's installer chunk
 
+
     # --- COMPLETION SYSTEM ---
+
     autoload -Uz compinit && compinit -C
     
+
     # --- ZSH PLUGINS PARAMETERS ---
+
     # zsh-nvm
     export NVM_LAZY_LOAD=true
     export NVM_LAZY_LOAD_EXTRA_COMMANDS=('nvim')
@@ -26,7 +30,9 @@ main() {
     export PYTHON_AUTO_VRUN=true
     export PYTHON_VENV_NAME='.venv'
 
+
     # --- ZSH PLUGINS ---
+
     # NVM - must be first because launch node.js
     zinit ice wait lucid; zinit light lukechilds/zsh-nvm
 
@@ -45,7 +51,9 @@ main() {
     zinit ice wait lucid
     zinit light zdharma-continuum/fast-syntax-highlighting
 
+
     # --- CUSTOM ZSH CONFIGURATION ---
+
     source "$ZDOTDIR/.zsh_custom"
 }
 

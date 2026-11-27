@@ -21,3 +21,15 @@ delta__install() {
 delta__configure() {
   return 0
 }
+
+delta__is_installed() {
+  lib__apt_is_installed git-delta
+}
+
+delta__remove() {
+  lib__apt_remove git-delta
+}
+
+delta__deconfigure() {
+  return 0
+}

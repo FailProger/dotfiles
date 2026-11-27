@@ -18,3 +18,15 @@ cchef__install() {
 cchef__configure() {
   return 0
 }
+
+cchef__is_installed() {
+  command -v cchef > /dev/null 2>&1
+}
+
+cchef__remove() {
+  lib__as_root rm -f /usr/local/bin/cchef
+}
+
+cchef__deconfigure() {
+  return 0
+}

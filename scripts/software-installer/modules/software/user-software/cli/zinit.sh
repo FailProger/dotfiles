@@ -23,3 +23,15 @@ EOF
 zinit__configure() {
   return 0
 }
+
+zinit__is_installed() {
+  [[ -d "$HOME/.local/share/zinit" ]]
+}
+
+zinit__remove() {
+  rm -rf "$HOME/.local/share/zinit" "$HOME/.zinit"
+}
+
+zinit__deconfigure() {
+  return 0
+}

@@ -18,3 +18,15 @@ fzf__install() {
 fzf__configure() {
   return 0
 }
+
+fzf__is_installed() {
+  command -v fzf > /dev/null 2>&1
+}
+
+fzf__remove() {
+  lib__as_root rm -f /usr/local/bin/fzf
+}
+
+fzf__deconfigure() {
+  return 0
+}

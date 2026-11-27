@@ -18,3 +18,15 @@ ffuf__install() {
 ffuf__configure() {
   return 0
 }
+
+ffuf__is_installed() {
+  command -v ffuf > /dev/null 2>&1
+}
+
+ffuf__remove() {
+  lib__as_root rm -f /usr/local/bin/ffuf
+}
+
+ffuf__deconfigure() {
+  return 0
+}

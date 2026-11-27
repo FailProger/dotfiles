@@ -1,0 +1,82 @@
+# --- CONFIG.H ---
+
+--- a/src/config.h
++++ b/src/config.h
+@@ -74,12 +74,11 @@ enum animation_trigger {
+ 	ANIMATION_TRIGGER_OPEN,
+ 	/// When a window is closed
+ 	ANIMATION_TRIGGER_CLOSE,
++	/// When the workspace is switched
+ 	ANIMATION_TRIGGER_WORKSPACE_IN,
+ 	ANIMATION_TRIGGER_WORKSPACE_IN_INVERSE,
+ 	ANIMATION_TRIGGER_WORKSPACE_OUT,
+ 	ANIMATION_TRIGGER_WORKSPACE_OUT_INVERSE,
+-	/// When a window's geometry changes
+-	ANIMATION_TRIGGER_GEOMETRY,
+ 	/// When a window's size changes
+ 	ANIMATION_TRIGGER_SIZE,
+ 	/// When a window's position changes
+@@ -98,21 +97,20 @@ enum animation_trigger {
+ };
+ 
+ static const char *animation_trigger_names[] attr_unused = {
+-    [ANIMATION_TRIGGER_SHOW] = "show",
+-    [ANIMATION_TRIGGER_HIDE] = "hide",
+-    [ANIMATION_TRIGGER_INCREASE_OPACITY] = "increase-opacity",
+-    [ANIMATION_TRIGGER_DECREASE_OPACITY] = "decrease-opacity",
+-    [ANIMATION_TRIGGER_OPEN] = "open",
+-    [ANIMATION_TRIGGER_CLOSE] = "close",
+-    [ANIMATION_TRIGGER_WORKSPACE_IN] = "workspace-in",
+-    [ANIMATION_TRIGGER_WORKSPACE_IN_INVERSE] = "workspace-in-inverse",
+-    [ANIMATION_TRIGGER_WORKSPACE_OUT] = "workspace-out",
+-    [ANIMATION_TRIGGER_WORKSPACE_OUT_INVERSE] = "workspace-out-inverse",
+-    [ANIMATION_TRIGGER_GEOMETRY] = "geometry",
+-    [ANIMATION_TRIGGER_SIZE] = "size",
+-    [ANIMATION_TRIGGER_POSITION] = "position",
+-    [ANIMATION_TRIGGER_COLOR] = "color",
+-    [ANIMATION_TRIGGER_ALIAS_GEOMETRY] = "geometry",
++    	[ANIMATION_TRIGGER_SHOW] = "show",
++    	[ANIMATION_TRIGGER_HIDE] = "hide",
++    	[ANIMATION_TRIGGER_INCREASE_OPACITY] = "increase-opacity",
++    	[ANIMATION_TRIGGER_DECREASE_OPACITY] = "decrease-opacity",
++    	[ANIMATION_TRIGGER_OPEN] = "open",
++    	[ANIMATION_TRIGGER_CLOSE] = "close",
++    	[ANIMATION_TRIGGER_WORKSPACE_IN] = "workspace-in",
++    	[ANIMATION_TRIGGER_WORKSPACE_IN_INVERSE] = "workspace-in-inverse",
++    	[ANIMATION_TRIGGER_WORKSPACE_OUT] = "workspace-out",
++    	[ANIMATION_TRIGGER_WORKSPACE_OUT_INVERSE] = "workspace-out-inverse",
++    	[ANIMATION_TRIGGER_SIZE] = "size",
++    	[ANIMATION_TRIGGER_POSITION] = "position",
++    	[ANIMATION_TRIGGER_COLOR] = "color",
++    	[ANIMATION_TRIGGER_ALIAS_GEOMETRY] = "geometry",
+ };
+ 
+ struct shader_specification {
+
+
+# --- WIN.C ---
+
+--- a/src/wm/win.c
++++ b/src/wm/win.c
+@@ -1848,9 +1848,7 @@ bool win_process_animation_and_state_change(struct session *ps, struct win *w, d
+ 			                          : ANIMATION_TRIGGER_SHOW;
+ 
+ 			if (ps->root_desktop_switch_direction != 0) {
+-				trigger = (ps->root_desktop_switch_direction < 0 &&
+-				           ps->root_desktop_switch_direction >= -1) ||
+-				                  ps->root_desktop_switch_direction > 1
++				trigger = ps->root_desktop_switch_direction < 0
+ 				              ? ANIMATION_TRIGGER_WORKSPACE_IN_INVERSE
+ 				              : ANIMATION_TRIGGER_WORKSPACE_IN;
+ 			}
+@@ -1873,9 +1871,7 @@ bool win_process_animation_and_state_change(struct session *ps, struct win *w, d
+ 			trigger = ANIMATION_TRIGGER_HIDE;
+ 
+ 			if (ps->root_desktop_switch_direction != 0) {
+-				trigger = (ps->root_desktop_switch_direction < 0 &&
+-				           ps->root_desktop_switch_direction >= -1) ||
+-				                  ps->root_desktop_switch_direction > 1
++				trigger = ps->root_desktop_switch_direction < 0
+ 				              ? ANIMATION_TRIGGER_WORKSPACE_OUT_INVERSE
+ 				              : ANIMATION_TRIGGER_WORKSPACE_OUT;
+ 			}

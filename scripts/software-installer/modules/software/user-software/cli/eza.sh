@@ -18,3 +18,15 @@ eza__install() {
 eza__configure() {
   lib__cp_config 'eza'
 }
+
+eza__is_installed() {
+  command -v eza > /dev/null 2>&1
+}
+
+eza__remove() {
+  lib__as_root rm -f /usr/local/bin/eza
+}
+
+eza__deconfigure() {
+  rm -rf "$HOME/.config/eza"
+}

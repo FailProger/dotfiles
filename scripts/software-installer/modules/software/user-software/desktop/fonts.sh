@@ -33,3 +33,16 @@ fonts__install() {
 fonts__configure() {
   return 0
 }
+
+fonts__is_installed() {
+  [[ -d /usr/local/share/fonts/hack-nerd-font ]]
+}
+
+fonts__remove() {
+  lib__as_root rm -rf /usr/local/share/fonts/hack-nerd-font
+  lib__as_root fc-cache -f
+}
+
+fonts__deconfigure() {
+  return 0
+}

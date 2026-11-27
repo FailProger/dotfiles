@@ -19,3 +19,15 @@ shellfirm__install() {
 shellfirm__configure() {
   lib__cp_config 'shellfirm'
 }
+
+shellfirm__is_installed() {
+  command -v shellfirm > /dev/null 2>&1
+}
+
+shellfirm__remove() {
+  lib__as_root rm -f /usr/local/bin/shellfirm
+}
+
+shellfirm__deconfigure() {
+  rm -rf "$HOME/.config/shellfirm"
+}

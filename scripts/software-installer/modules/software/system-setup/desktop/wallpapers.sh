@@ -27,3 +27,15 @@ EOF
   find "$wp_dir" -type d -exec chmod 755 {} +
   find "$wp_dir" -type f -exec chmod 644 {} +
 }
+
+wallpapers__is_installed() {
+  [[ -d "$HOME/.local/share/wallpapers" ]]
+}
+
+wallpapers__remove() {
+  return 0
+}
+
+wallpapers__deconfigure() {
+  rm -rf "$HOME/.local/share/wallpapers" "$HOME/.fehbg"
+}

@@ -47,3 +47,15 @@ seclists__configure() {
     lib__log_warn "rockyou.txt not found at $leaked_db_dir."
   fi
 }
+
+seclists__is_installed() {
+  [[ -d /usr/local/share/seclists/Passwords ]]
+}
+
+seclists__remove() {
+  lib__as_root rm -rf /usr/local/share/seclists
+}
+
+seclists__deconfigure() {
+  lib__as_root rm -f /usr/local/share/wordlists/rockyou.txt
+}

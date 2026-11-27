@@ -96,3 +96,17 @@ docker__configure() {
 
   lib__as_root systemctl enable --now docker
 }
+
+docker__is_installed() {
+  lib__apt_is_installed docker-ce
+}
+
+docker__remove() {
+  lib__as_root rm -f /etc/apt/sources.list.d/docker.list /etc/apt/keyrings/docker.gpg
+  lib__apt_remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+}
+
+docker__deconfigure() {
+  lib__as_root systemctl disable --now docker 2> /dev/null || true
+  lib__as_root gpasswd -d "$USER" docker 2> /dev/null || true
+}

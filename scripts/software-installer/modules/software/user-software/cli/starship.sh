@@ -18,3 +18,15 @@ starship__install() {
 starship__configure() {
   lib__cp_config 'starship'
 }
+
+starship__is_installed() {
+  command -v starship > /dev/null 2>&1
+}
+
+starship__remove() {
+  lib__as_root rm -f /usr/local/bin/starship
+}
+
+starship__deconfigure() {
+  rm -rf "$HOME/.config/starship"
+}

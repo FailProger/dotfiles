@@ -1,4 +1,5 @@
 # --- XORG CONFIGURE ---
+
 # Nvidia driver settings
 #nvidia-settings --assign 'CurrentMetaMode=DP-4: <width>x<height>_<hz> @<width>x<height> +0+0'
 
@@ -9,7 +10,9 @@ setxkbmap -layout 'us,ru' -variant ',typo' -option 'grp:toggle,lv3:caps_switch' 
 # Session auto lock
 xss-lock --transfer-sleep-lock -- i3lock --nofork &
 
+
 # --- VISUAL ---
+
 # Visual compouser
 picom -b &
 
@@ -19,9 +22,13 @@ dwmblocks &
 # Wallpaper
 ~/.fehbg &
 
+
 # --- AUTO START ---
+
 # SSH agent
 eval "$(ssh-agent)"
 
+
 # --- START GUI ---
+
 exec dwm

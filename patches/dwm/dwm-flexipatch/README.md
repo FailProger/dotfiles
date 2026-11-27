@@ -4,7 +4,9 @@ DWM INSTALLATION
 ## Warning
 It is not official repo. It is my dwm configuration base on `bakkeby/dwm-flexipatch`.
 
-For about `dwm-flexipatch` more see author: `https://github.com/bakkeby/dwm-flexipatch`.
+For more about `dwm-flexipatch` see author: `https://github.com/bakkeby/dwm-flexipatch`.
+
+---
 
 ## How install
 1. Clone and patch `dwm-flexipatch` (**NOT** `dwm`)
@@ -14,10 +16,10 @@ For about `dwm-flexipatch` more see author: `https://github.com/bakkeby/dwm-flex
 5. Finalize and make
 
 ### Step by step
-Clone repo:
+Clone with repo:
 ```
 git clone --depth 1 'https://github.com/FailProger/dotfiles'
-cd dotfiles/suckless/dwm/dwm-flexipatch
+cd dotfiles/patches/dwm/dwm-flexipatch
 ```
 
 Clone `dwm-flexipatch` and patch:

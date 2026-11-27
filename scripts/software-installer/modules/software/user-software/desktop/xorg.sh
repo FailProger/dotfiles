@@ -25,3 +25,15 @@ xorg__install() {
 xorg__configure() {
   return 0
 }
+
+xorg__is_installed() {
+  lib__apt_is_installed xserver-xorg && lib__apt_is_installed xinit
+}
+
+xorg__remove() {
+  lib__apt_remove xserver-xorg xinit xauth x11-xserver-utils x11-xkb-utils xclip
+}
+
+xorg__deconfigure() {
+  return 0
+}

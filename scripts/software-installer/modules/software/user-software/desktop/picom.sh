@@ -1,12 +1,3 @@
-# picom is built from source: the release in the distribution repositories is
-# too old for the current configuration. PICOM_VERSION can pin a release tag;
-# by default the latest stable tag is used.
-#
-# libconfig >= 1.7 is required. When the distribution ships an older version,
-# meson builds a static copy from the bundled subproject, which is why cmake is
-# a build dependency and old distributions do not need a libconfig runtime
-# package.
-
 picom__get_build_dependencies() {
   local deps='
   ca-certificates
@@ -76,75 +67,43 @@ picom__get_runtime_dependencies() {
   echo "$deps"
 }
 
-# Latest stable release tag. Version tags look like v13 or v12.5; anything
-# else (vNext, v13-rc1) is rejected by the pattern.
-_picom__latest_release_tag() {
-  local repo="${1:?'Do not get repo!'}"
-
-  git ls-remote --tags --refs --sort=-v:refname "$repo" 2> /dev/null \
-    | awk -F '\t' '{ sub(/^refs\/tags\//, "", $2); print $2 }' \
-    | grep -E '^v[0-9]+(\.[0-9]+)*$' \
-    | head -n 1
-}
-
 picom__install() {
-  local repo='https://github.com/yshui/picom.git'
+  local repo=${PICOM_REPO:-'https://github.com/pijulius/picom'}
+  local branch="${PICOM_BRANCH:-'next'}"
   local prefix='/usr/local'
-  local tag="${PICOM_VERSION:-}"
-  local had_binary=0
+
+  local picom_dir="$PATCHES_DIR/picom"
   local workdir
 
-  if lib__apt_is_installed picom; then
-    lib__log_warn 'The apt package picom is installed as well; /usr/local/bin/picom built here takes precedence.'
-  fi
+  workdir="$(lib__tmpdir)"
 
-  if [[ -e "$prefix/bin/picom" ]]; then
-    had_binary=1
-  fi
+  cd "$workdir"
 
-  if [[ -z "$tag" ]]; then
-    tag="$(_picom__latest_release_tag "$repo")"
-  fi
+  git clone --depth 1 --branch "$branch" "$repo" picom
+  cd picom
 
-  if [[ -z "$tag" ]]; then
-    lib__log_error 'Cannot resolve the picom release tag to build.'
-    return 1
-  fi
+  patch -p1 < "$picom_dir/my-patches.diff"
+  cp "$picom_dir/animation_presets.conf" data/animation_presets.conf
 
-  lib__log_info "Building picom $tag from source."
+  meson setup \
+    --buildtype=release \
+    --prefix="$prefix" \
+    -Dstrip=true \
+    -Dcompton=false \
+    build
+  meson compile -C build animgen
+  ./build/tools/animgen data/animation_presets.conf > src/transition/generated/script_templates.c
 
-  workdir="$(mktemp -d)"
-
-  if ! (
-    cd "$workdir" || exit 1
-
-    git clone --depth 1 --branch "$tag" "$repo" picom || exit 1
-    cd picom || exit 1
-
-    meson setup \
-      --buildtype=release \
-      --prefix="$prefix" \
-      -Dstrip=true \
-      -Dcompton=false \
-      build || exit 1
-
-    ninja -C build || exit 1
-    lib__as_root ninja -C build install || exit 1
-  ); then
-    lib__log_error "Failed to build picom $tag."
-    rm -rf "$workdir"
-    return 1
-  fi
-
-  rm -rf "$workdir"
-
-  if [[ "$had_binary" -eq 0 ]]; then
-    lib__state_mark_owned
-  fi
+  ninja -C build
+  lib__as_root ninja -C build install
 }
 
 picom__configure() {
   lib__cp_config 'picom'
+}
+
+picom__is_installed() {
+  command -v picom > /dev/null 2>&1
 }
 
 picom__remove() {
@@ -160,14 +119,10 @@ picom__remove() {
     '/usr/local/lib64/pkgconfig/picom-api.pc'
   )
 
-  if ! lib__state_is_owned; then
-    lib__log_info 'picom was not installed by this installer; keeping it.'
-    lib__state_mark_kept
-    return 0
-  fi
-
   lib__as_root rm -f "${files[@]}"
   lib__as_root rmdir --ignore-fail-on-non-empty '/usr/local/include/picom' 2> /dev/null || true
+}
 
-  lib__log_info 'Removed picom built from source.'
+picom__deconfigure() {
+  rm -rf "$HOME/.config/picom"
 }

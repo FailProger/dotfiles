@@ -1,7 +1,8 @@
-diff -ruN a/patch/bar_flexwintitle.c b/patch/bar_flexwintitle.c
---- a/patch/bar_flexwintitle.c	2026-11-08 19:17:40.993945319 +0300
-+++ b/patch/bar_flexwintitle.c	2026-11-08 19:17:13.580777123 +0300
-@@ -241,7 +241,9 @@
+# --- PATCH/ ---
+
+--- a/patch/bar_flexwintitle.c
++++ b/patch/bar_flexwintitle.c
+@@ -241,7 +241,9 @@ flextitledraw(Monitor *m, Client *c, int unused, int x, int w, int tabscheme, Ar
  	#endif // BAR_WINICON_PATCH
  
  	drw_text(drw, tx, a->y, tw, a->h, 0, c->name, 0, False);
@@ -11,7 +12,7 @@ diff -ruN a/patch/bar_flexwintitle.c b/patch/bar_flexwintitle.c
  
  	if (FLEXWINTITLE_BORDERS) {
  		XSetForeground(drw->dpy, drw->gc, scheme[SchemeSel][ColBorder].pixel);
-@@ -257,8 +259,10 @@
+@@ -257,8 +259,10 @@ flextitledraw(Monitor *m, Client *c, int unused, int x, int w, int tabscheme, Ar
  			nclienttags++;
  	}
  
@@ -22,9 +23,8 @@ diff -ruN a/patch/bar_flexwintitle.c b/patch/bar_flexwintitle.c
  }
  
  #ifndef HIDDEN
-diff -ruN a/patch/bar_indicators.c b/patch/bar_indicators.c
---- a/patch/bar_indicators.c	2026-11-08 19:17:40.980851324 +0300
-+++ b/patch/bar_indicators.c	2026-11-08 19:17:13.563492910 +0300
+--- a/patch/bar_indicators.c
++++ b/patch/bar_indicators.c
 @@ -1,4 +1,6 @@
 +#if BAR_TAG_INDICATOR_PATCH
  /* Indicator properties, you can override these in your config.h if you want. */
@@ -32,29 +32,27 @@ diff -ruN a/patch/bar_indicators.c b/patch/bar_indicators.c
  #ifndef TAGSINDICATOR
  #define TAGSINDICATOR 1 // 0 = off, 1 = on if >1 client/view tag, 2 = always on
  #endif
-@@ -113,3 +115,4 @@
+@@ -113,3 +115,4 @@ drawstateindicator(Monitor *m, Client *c, unsigned int occ, int x, int y, int w,
  	#endif // ALWAYSONTOP_PATCH
  }
  
 +#endif
-diff -ruN a/patch/bar_indicators.h b/patch/bar_indicators.h
---- a/patch/bar_indicators.h	2026-11-08 19:17:40.981013572 +0300
-+++ b/patch/bar_indicators.h	2026-11-08 19:17:13.563736059 +0300
+--- a/patch/bar_indicators.h
++++ b/patch/bar_indicators.h
 @@ -1,3 +1,5 @@
 +#if BAR_TAG_INDICATOR_PATCH
 +
  enum {
  	INDICATOR_NONE,
  	INDICATOR_TOP_LEFT_SQUARE,
-@@ -19,3 +21,4 @@
+@@ -19,3 +21,4 @@ enum {
  static void drawindicator(Monitor *m, Client *c, unsigned int occ, int x, int y, int w, int h, unsigned int tag, int filled, int invert, int type);
  static void drawstateindicator(Monitor *m, Client *c, unsigned int occ, int x, int y, int w, int h, unsigned int tag, int filled, int invert);
  
 +#endif
-diff -ruN a/patch/bar_tags.c b/patch/bar_tags.c
---- a/patch/bar_tags.c	2026-11-08 19:17:40.981053977 +0300
-+++ b/patch/bar_tags.c	2026-11-08 19:17:13.563795491 +0300
-@@ -56,7 +56,9 @@
+--- a/patch/bar_tags.c
++++ b/patch/bar_tags.c
+@@ -56,7 +56,9 @@ draw_tags(Bar *bar, BarArg *a)
  			: SchemeTagsNorm
  		]);
  		drw_text(drw, x, a->y, w, a->h, lrpad / 2, icon, invert, False);
@@ -64,10 +62,9 @@ diff -ruN a/patch/bar_tags.c b/patch/bar_tags.c
  		#if BAR_UNDERLINETAGS_PATCH
  		if (ulineall || m->tagset[m->seltags] & 1 << i) {
  			if (ulinetop) {
-diff -ruN a/patch/bar_wintitle.c b/patch/bar_wintitle.c
---- a/patch/bar_wintitle.c	2026-11-08 19:17:40.982496104 +0300
-+++ b/patch/bar_wintitle.c	2026-11-08 19:17:13.565762480 +0300
-@@ -79,7 +79,11 @@
+--- a/patch/bar_wintitle.c
++++ b/patch/bar_wintitle.c
+@@ -79,7 +79,11 @@ draw_wintitle(Bar *bar, BarArg *a)
  	XSync(dpy, False);
  	XSetErrorHandler(xerror);
  	#endif // BAR_IGNORE_XFT_ERRORS_WHEN_DRAWING_TEXT_PATCH
@@ -79,9 +76,8 @@ diff -ruN a/patch/bar_wintitle.c b/patch/bar_wintitle.c
  	return 1;
  }
  
-diff -ruN a/patch/include.c b/patch/include.c
---- a/patch/include.c	2026-11-08 19:17:40.982776193 +0300
-+++ b/patch/include.c	2026-11-08 19:17:13.566128407 +0300
+--- a/patch/include.c
++++ b/patch/include.c
 @@ -1,5 +1,7 @@
  /* Bar functionality */
 +#if BAR_TAG_INDICATOR_PATCH
@@ -90,9 +86,8 @@ diff -ruN a/patch/include.c b/patch/include.c
  #include "bar_tagicons.c"
  #include "bar.c"
  
-diff -ruN a/patch/include.h b/patch/include.h
---- a/patch/include.h	2026-11-08 19:17:40.985216323 +0300
-+++ b/patch/include.h	2026-11-08 19:17:13.569489999 +0300
+--- a/patch/include.h
++++ b/patch/include.h
 @@ -1,5 +1,7 @@
  /* Bar functionality */
 +#if BAR_TAG_INDICATOR_PATCH
@@ -101,9 +96,23 @@ diff -ruN a/patch/include.h b/patch/include.h
  #include "bar_tagicons.h"
  #include "bar.h"
  
+
+
+# --- DWM.C ---
+
 --- a/dwm.c
 +++ b/dwm.c
-@@ -712,6 +712,9 @@
+@@ -369,6 +369,9 @@ struct Client {
+ 	unsigned int switchtag;
+ 	#endif // SWITCHTAG_PATCH
+ 	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
++	#if WINDOW_UNMAP_PATCH
++	int taghidden; /* unmapped because its tag is not visible */
++	#endif // WINDOW_UNMAP_PATCH
+ 	#if ALWAYSONTOP_PATCH
+ 	int alwaysontop;
+ 	#endif // ALWAYSONTOP_PATCH
+@@ -712,6 +715,9 @@ static Client *nexttiled(Client *c);
  #if NOBORDER_PATCH
  static int noborder(Client *c);
  #endif // NOBORDER_PATCH
@@ -113,7 +122,7 @@ diff -ruN a/patch/include.h b/patch/include.h
  #if !ZOOMSWAP_PATCH || TAGINTOSTACK_ALLMASTER_PATCH || TAGINTOSTACK_ONEMASTER_PATCH
  static void pop(Client *c);
  #endif // !ZOOMSWAP_PATCH / TAGINTOSTACK_ALLMASTER_PATCH / TAGINTOSTACK_ONEMASTER_PATCH
-@@ -2747,6 +2750,9 @@
+@@ -2747,6 +2753,9 @@ manage(Window w, XWindowAttributes *wa)
  
  	if (!c->isfloating)
  		c->isfloating = c->oldstate = trans != None || c->isfixed;
@@ -123,7 +132,7 @@ diff -ruN a/patch/include.h b/patch/include.h
  	if (c->isfloating) {
  		XRaiseWindow(dpy, c->win);
  		XSetWindowBorder(dpy, w, scheme[SchemeNorm][ColFloat].pixel);
-@@ -3041,6 +3047,19 @@
+@@ -3041,6 +3050,19 @@ noborder(Client *c)
  }
  #endif // NOBORDER_PATCH
  
@@ -143,7 +152,35 @@ diff -ruN a/patch/include.h b/patch/include.h
  #if !ZOOMSWAP_PATCH || TAGINTOSTACK_ALLMASTER_PATCH || TAGINTOSTACK_ONEMASTER_PATCH
  void
  pop(Client *c)
-@@ -4461,6 +4480,9 @@
+@@ -4173,6 +4195,12 @@ showhide(Client *c)
+ 	if (!c)
+ 		return;
+ 	if (ISVISIBLE(c)) {
++		#if WINDOW_UNMAP_PATCH
++		if (c->taghidden) {
++			c->taghidden = 0;
++			XMapWindow(dpy, c->win);
++		}
++		#endif // WINDOW_UNMAP_PATCH
+ 		#if !RENAMED_SCRATCHPADS_PATCH
+ 		#if SCRATCHPADS_PATCH && SCRATCHPADS_KEEP_POSITION_AND_SIZE_PATCH
+ 		if (
+@@ -4229,7 +4257,14 @@ showhide(Client *c)
+ 		#endif // RENAMED_SCRATCHPADS_AUTO_HIDE_PATCH
+ 		/* hide clients bottom up */
+ 		showhide(c->snext);
++		#if WINDOW_UNMAP_PATCH
++		if (!c->taghidden) {
++			c->taghidden = 1;
++			XUnmapWindow(dpy, c->win);
++		}
++		#else
+ 		XMoveWindow(dpy, c->win, WIDTH(c) * -2, c->y);
++		#endif // WINDOW_UNMAP_PATCH
+ 	}
+ }
+ 
+@@ -4465,6 +4500,9 @@ togglefloating(const Arg *arg)
  	#endif // FAKEFULLSCREEN_CLIENT_PATCH
  	#endif // !FAKEFULLSCREEN_PATCH
  	c->isfloating = !c->isfloating || c->isfixed;
@@ -153,9 +190,63 @@ diff -ruN a/patch/include.h b/patch/include.h
  	#if !BAR_FLEXWINTITLE_PATCH
  	#if RENAMED_SCRATCHPADS_PATCH
  	if (c->scratchkey != 0 && c->isfloating)
+@@ -4617,6 +4655,9 @@ toggleview(const Arg *arg)
+ 			togglebar(NULL);
+ 		#endif // PERTAGBAR_PATCH
+ 		#endif // PERTAG_PATCH
++		#if BAR_EWMHTAGS_PATCH
++		updatecurrentdesktop();
++		#endif // BAR_EWMHTAGS_PATCH
+ 		#if !TAGSYNC_PATCH
+ 		arrange(selmon);
+ 		focus(NULL);
+@@ -4636,9 +4677,6 @@ toggleview(const Arg *arg)
+ 	}
+ 	#endif // EMPTYVIEW_PATCH
+ 	#endif // TAGSYNC_PATCH
+-	#if BAR_EWMHTAGS_PATCH
+-	updatecurrentdesktop();
+-	#endif // BAR_EWMHTAGS_PATCH
+ }
+ 
+ void
+@@ -4815,6 +4853,10 @@ unmapnotify(XEvent *e)
+ 	XUnmapEvent *ev = &e->xunmap;
+ 
+ 	if ((c = wintoclient(ev->window))) {
++		#if WINDOW_UNMAP_PATCH
++		if (c->taghidden)
++			return;
++		#endif // WINDOW_UNMAP_PATCH
+ 		if (ev->send_event)
+ 			setclientstate(c, WithdrawnState);
+ 		else
+@@ -5319,15 +5361,15 @@ view(const Arg *arg)
+ 	}
+ 	selmon = origselmon;
+ 	#endif // TAGSYNC_PATCH
++	#if BAR_EWMHTAGS_PATCH
++	updatecurrentdesktop();
++	#endif // BAR_EWMHTAGS_PATCH
+ 	#if TAGSYNC_PATCH
+ 	arrange(NULL);
+ 	#else
+ 	arrange(selmon);
+ 	#endif // TAGSYNC_PATCH
+ 	focus(NULL);
+-	#if BAR_EWMHTAGS_PATCH
+-	updatecurrentdesktop();
+-	#endif // BAR_EWMHTAGS_PATCH
+ }
+ 
+ Client *
+
+
+# --- CONFIG.DEF.H ---
+
 --- a/config.def.h
 +++ b/config.def.h
-@@ -11,6 +11,9 @@
+@@ -11,6 +11,9 @@ static const int corner_radius           = 10;
  #else
  static const unsigned int borderpx       = 1;   /* border pixel of windows */
  #endif // ROUNDED_CORNERS_PATCH
@@ -165,7 +256,7 @@ diff -ruN a/patch/include.h b/patch/include.h
  #if BAR_BORDER_PATCH
  /* This allows the bar border size to be explicitly set separately from borderpx.
   * If left as 0 then it will default to the borderpx value of the monitor and will
-@@ -144,9 +147,11 @@
+@@ -144,9 +147,11 @@ static const unsigned int maxhtab          = 200;  /* tab menu height */
  #endif // ALT_TAB_PATCH
  
  /* Indicators: see patch/bar_indicators.h for options */
@@ -177,6 +268,10 @@ diff -ruN a/patch/include.h b/patch/include.h
  #if FAKEFULLSCREEN_CLIENT_PATCH && !FAKEFULLSCREEN_PATCH
  static int fakefsindicatortype           = INDICATOR_PLUS;
  static int floatfakefsindicatortype      = INDICATOR_PLUS_AND_LARGER_SQUARE;
+
+
+# --- PATCHES.DEF.H ---
+
 --- a/patches.def.h
 +++ b/patches.def.h
 @@ -180,6 +180,9 @@
@@ -199,3 +294,13 @@ diff -ruN a/patch/include.h b/patch/include.h
  /* Enable modifying or removing dmenu in config.def.h which resulted previously in a
   * compilation error because two lines of code hardcode dmenu into dwm.
   * https://dwm.suckless.org/patches/nodmenu/
+@@ -1469,6 +1475,9 @@
+  */
+ #define WINDOWROLERULE_PATCH 0
+ 
++/* Simple version of "windowmap" patch. Change XMoveWindow to XUnmapWindow for picom tracking. */
++#define WINDOW_UNMAP_PATCH 0
++
+ /* The winview patch allows switching the view to that of a given client from the all-window
+  * view (Mod-0) using a keyboard shortcut.
+  * http://dwm.suckless.org/patches/winview/

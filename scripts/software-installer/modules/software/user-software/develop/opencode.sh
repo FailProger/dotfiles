@@ -37,3 +37,15 @@ opencode__install() {
 opencode__configure() {
   return 0
 }
+
+opencode__is_installed() {
+  command -v opencode > /dev/null 2>&1
+}
+
+opencode__remove() {
+  lib__as_root rm -f /usr/local/bin/opencode
+}
+
+opencode__deconfigure() {
+  return 0
+}

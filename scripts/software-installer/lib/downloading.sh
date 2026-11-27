@@ -53,11 +53,11 @@ lib__wget_download_github_release() {
   local i
 
   for (( i=0; i < "$LIB_DOWNLOAD__ATTEMPTS"; i++ )); do
-    download_url=$(
+    download_url="$(
       wget -qO- --connect-timeout="$LIB_DOWNLOAD__CONNECT_TIMEOUT" --read-timeout="$LIB_DOWNLOAD__READ_TIMEOUT" "https://api.github.com/repos/$repo/releases/latest" \
         | grep -oP '"browser_download_url":\s*"\K[^"]+' \
         | grep -m1 "$file_name"
-    )
+    )"
 
     if [[ -n "$download_url" ]]; then
       if lib__wget_download "$download_url" "$output_document"; then

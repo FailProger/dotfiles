@@ -350,10 +350,9 @@ lib__apt_reverse_dependencies() {
     | LC_ALL=C sort -u
 }
 
-# Purge packages that a module installed as its main program. Modules must
-# check ownership before calling this from __remove. If another installed
-# package depends on one of them, nothing is removed and the module is marked
-# as kept instead of breaking the system.
+# Purge packages that a module installed as its main program. If another
+# installed package depends on one of them, nothing is removed and 3 is
+# returned: the phase runner treats that as "kept", not as a failure.
 lib__apt_remove() {
   local package
   local -a installed=()
@@ -375,8 +374,7 @@ lib__apt_remove() {
   for package in "${installed[@]}"; do
     if [[ -n "$(lib__apt_reverse_dependencies "$package")" ]]; then
       lib__log_warn "Keeping '$package': other installed packages depend on it."
-      lib__state_mark_kept
-      return 0
+      return 3
     fi
   done
 

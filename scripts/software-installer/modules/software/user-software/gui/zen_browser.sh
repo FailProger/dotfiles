@@ -77,3 +77,16 @@ MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rs
 StartupNotify=true
 EOF
 }
+
+zen_browser__is_installed() {
+  [[ -x /opt/zen/zen ]]
+}
+
+zen_browser__remove() {
+  lib__as_root rm -rf /opt/zen
+}
+
+zen_browser__deconfigure() {
+  lib__as_root rm -f /usr/local/bin/zen /usr/local/share/applications/zen.desktop
+  rm -f "$HOME/.local/share/applications/zen-scalpel.desktop"
+}

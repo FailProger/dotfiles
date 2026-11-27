@@ -18,3 +18,15 @@ gdu__install() {
 gdu__configure() {
   return 0
 }
+
+gdu__is_installed() {
+  command -v gdu > /dev/null 2>&1
+}
+
+gdu__remove() {
+  lib__as_root rm -f /usr/local/bin/gdu
+}
+
+gdu__deconfigure() {
+  return 0
+}

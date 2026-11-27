@@ -18,6 +18,9 @@ CONFIG_DIR="${CONFIG_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)/config}"
 # Directory with local repository data (wallpapers, scripts, etc.).
 LOCAL_DIR="${LOCAL_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)/local}"
 
+# Directory with patches for programs
+PATCHES_DIR="${PATCHES_DIR:-$(cd -- "$SCRIPT_DIR/../.." && pwd)/patches}"
+
 # --- OUTPUT ---
 # Color output: auto | always | never. Can also be set with --color.
 UI_COLOR="${UI_COLOR:-auto}"

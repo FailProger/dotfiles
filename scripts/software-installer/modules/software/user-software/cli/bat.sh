@@ -21,3 +21,15 @@ bat__install() {
 bat__configure() {
   return 0
 }
+
+bat__is_installed() {
+  lib__apt_is_installed bat
+}
+
+bat__remove() {
+  lib__apt_remove bat
+}
+
+bat__deconfigure() {
+  return 0
+}

@@ -26,15 +26,17 @@ command__all_modules() {
   command__all_modules_in_dir "$SOFTWARE_DIR"
 }
 
-# Status shown by --list: "done" once the install phase is recorded for the
-# current module fingerprint (including -m/--mark-installed).
+# Status shown by list: "done" once the install phase is recorded for the
+# current module fingerprint, or when the program is present outside the
+# installer.
 command__module_status() {
   local module_file="${1:?'Do not get module file!'}"
   local key
 
   key="$(_module_key "$module_file")"
 
-  if lib__state_phase_done "$key" install "$module_file"; then
+  if lib__state_phase_done "$key" install "$module_file" \
+    || lib__state_is_external "$key"; then
     printf 'done\n'
     return 0
   fi
@@ -240,29 +242,86 @@ command__confirm() {
   done
 }
 
+command__usage() {
+  cat << EOF
+Usage: ./$(basename "$0") [OPTIONS] COMMAND [COMMAND OPTIONS] TARGET...
+
+COMMANDS:
+  install      Install modules and their dependencies.
+  configure    Run only __configure for installed modules.
+  reinstall    Force __install and __configure again.
+  remove       Run __remove: remove the program, keep configuration.
+  deconfigure  Run __deconfigure: remove configuration, keep the program.
+  list         List all available modules and their state.
+
+TARGETS:
+  MODULE       A single module.
+  CATEGORY     Every module in a category under a group.
+  GROUP        Every module in a group.
+  all          Every module.
+
+GLOBAL OPTIONS:
+  -h, --help            Show this help and exit.
+  -y, --yes             Skip the confirmation prompt.
+  -d, --dry-run         Show the plan without changing anything.
+  -v, --verbose         Detailed plan: phases, packages and descriptions.
+      --color WHEN      Color output: auto, always or never (default: auto).
+      --keep-going      Continue with the remaining modules after a failure.
+
+INSTALL/REINSTALL OPTIONS:
+      --keep-build-deps Keep build dependencies and build-only modules.
+      --force-clean     Run apt autoremove even if a module failed.
+
+INSTALL OPTIONS:
+      --no-configure    Install the program only; do not run __configure.
+
+REMOVE OPTIONS:
+      --deconfigure     Also run __deconfigure after a successful __remove.
+
+EXAMPLES:
+  ./installer.sh install zsh
+  ./installer.sh -d install all
+  ./installer.sh install --keep-build-deps dwm
+  ./installer.sh configure zsh
+  ./installer.sh reinstall zsh
+  ./installer.sh remove zsh
+  ./installer.sh deconfigure zsh
+  ./installer.sh remove --deconfigure zsh
+  ./installer.sh list
+
+NOTES:
+  Software is installed for the user who runs the script.
+  Root operations ask for sudo only when they are needed.
+  Running the script as root installs software for root, not for the
+  current desktop user; normally run it without sudo.
+EOF
+}
+
 command_main() {
+  if [[ $# -eq 0 ]]; then
+    command__usage
+    return 0
+  fi
+
   local target
+  local action=''
   local run_install=''
   local dry_run=0
-  local install_only=0
-  local configure_only=0
-  local list_modules=0
-  local mark_installed=0
-  local reset=0
+  local no_configure=0
+  local remove_deconfigure=0
   local -a targets=()
   local -a modules=()
-
-  UI_COLOR_MODE="${UI_COLOR:-auto}"
-
-  trap 'rc=$?; lib__manifest_exit || true; lib__stop_sudo_keepalive; lib__state_unlock; exit "$rc"' EXIT
-
-  # Accept bundled short options such as -vn or -yn. Only single-dash
-  # alphabetic bundles are expanded; long options and values stay untouched.
   local -a argv=()
   local arg
   local index
   local expand_short=1
 
+  UI_COLOR_MODE="${UI_COLOR:-auto}"
+
+  trap 'rc=$?; lib__manifest_exit || true; lib__stop_sudo_keepalive; lib__state_unlock; exit "$rc"' EXIT
+
+  # Accept bundled short options such as -vd or -yd. Only single-dash
+  # alphabetic bundles are expanded; long options and values stay untouched.
   for arg in "$@"; do
     if [[ "$expand_short" -eq 0 ]]; then
       argv+=("$arg")
@@ -285,6 +344,7 @@ command_main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help)
+        command__usage
         return 0
         ;;
       -y|--yes)
@@ -311,32 +371,8 @@ command_main() {
         fi
         shift
         ;;
-      -n|--dry-run)
+      -d|--dry-run)
         dry_run=1
-        shift
-        ;;
-      -l|--list)
-        list_modules=1
-        shift
-        ;;
-      --install-only)
-        install_only=1
-        shift
-        ;;
-      --configure-only)
-        configure_only=1
-        shift
-        ;;
-      -f|--force)
-        INSTALL_FORCE=1
-        shift
-        ;;
-      -r|--reset)
-        reset=1
-        shift
-        ;;
-      -m|--mark-installed)
-        mark_installed=1
         shift
         ;;
       --keep-going)
@@ -349,6 +385,22 @@ command_main() {
         ;;
       --force-clean)
         INSTALL_FORCE_CLEAN=1
+        shift
+        ;;
+      --no-configure)
+        no_configure=1
+        shift
+        ;;
+      --deconfigure)
+        remove_deconfigure=1
+        shift
+        ;;
+      install|configure|reinstall|remove|deconfigure|list)
+        if [[ -n "$action" ]]; then
+          lib__log_error "Only one command is allowed: '$action' and '$1'."
+          return 1
+        fi
+        action="$1"
         shift
         ;;
       --)
@@ -369,41 +421,54 @@ command_main() {
 
   lib__ui_init || return 1
 
-  if [[ "$install_only" -eq 1 && "$configure_only" -eq 1 ]]; then
-    lib__log_error '--install-only and --configure-only are mutually exclusive.'
+  if [[ -z "$action" ]]; then
+    if [[ ${#targets[@]} -gt 0 ]]; then
+      lib__log_error "Unknown command: ${targets[0]}"
+      lib__log_error "Did you mean: ./$(basename "$0") install ${targets[*]}"
+    else
+      lib__log_error 'Do not get command!'
+    fi
     return 1
   fi
 
-  if [[ "$mark_installed" -eq 1 && "$reset" -eq 1 ]]; then
-    lib__log_error '--mark-installed and --reset are mutually exclusive.'
+  if [[ "$action" == 'list' ]]; then
+    if [[ ${#targets[@]} -gt 0 ]]; then
+      lib__log_error 'list does not accept targets.'
+      return 1
+    fi
+    command__list_modules
+    return 0
+  fi
+
+  if [[ ${#targets[@]} -eq 0 ]]; then
+    lib__log_error "Do not get modules for '$action'!"
     return 1
   fi
 
-  if [[ "$mark_installed" -eq 1 ]] \
-    && [[ "$install_only" -eq 1 || "$configure_only" -eq 1 ]]; then
-    lib__log_error '--mark-installed cannot be used with --install-only or --configure-only.'
+  if [[ "$action" != 'install' && "$action" != 'reinstall' ]]; then
+    if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 ]]; then
+      lib__log_error '--keep-build-deps is only valid for install and reinstall.'
+      return 1
+    fi
+    if [[ "$INSTALL_FORCE_CLEAN" -eq 1 ]]; then
+      lib__log_error '--force-clean is only valid for install and reinstall.'
+      return 1
+    fi
+  fi
+
+  if [[ "$action" != 'install' && "$no_configure" -eq 1 ]]; then
+    lib__log_error '--no-configure is only valid for install.'
+    return 1
+  fi
+
+  if [[ "$action" != 'remove' && "$remove_deconfigure" -eq 1 ]]; then
+    lib__log_error '--deconfigure is only valid for remove.'
     return 1
   fi
 
   if [[ "$INSTALL_KEEP_BUILD_DEPS" -eq 1 && "$INSTALL_FORCE_CLEAN" -eq 1 ]]; then
     lib__log_error '--keep-build-deps and --force-clean are mutually exclusive.'
     return 1
-  fi
-
-  if [[ "$list_modules" -eq 1 ]]; then
-    command__list_modules
-    return 0
-  fi
-
-  if [[ ${#targets[@]} -eq 0 ]]; then
-    lib__log_error 'Do not get modules to install!'
-    return 1
-  fi
-
-  if [[ "$install_only" -eq 1 ]]; then
-    INSTALL_MODE='install'
-  elif [[ "$configure_only" -eq 1 ]]; then
-    INSTALL_MODE='configure'
   fi
 
   INSTALL_DRY_RUN="$dry_run"
@@ -419,34 +484,50 @@ command_main() {
     return 1
   fi
 
-  if [[ "$mark_installed" -eq 1 ]]; then
-    if [[ "$dry_run" -eq 1 ]]; then
-      queue_modules "${modules[@]}" || return 1
-      lib__log_info 'Would mark as installed:'
-      for module_file in "${INSTALL_REQUESTED[@]}"; do
-        printf '  - %s\n' "$(basename "$module_file" .sh)"
-      done
-      return 0
-    fi
-
-    orchestrator__mark_installed "${modules[@]}" || return 1
-    lib__log_success "Marked ${#INSTALL_REQUESTED[@]} module(s) as installed."
-    return 0
-  fi
+  case "$action" in
+    install)
+      if [[ "$no_configure" -eq 1 ]]; then
+        INSTALL_MODE='install'
+      else
+        INSTALL_MODE='full'
+      fi
+      ;;
+    configure)
+      INSTALL_MODE='configure'
+      INSTALL_KEEP_BUILD_DEPS=0
+      INSTALL_FORCE_CLEAN=0
+      ;;
+    reinstall)
+      INSTALL_MODE='full'
+      INSTALL_FORCE=1
+      ;;
+    remove|deconfigure)
+      if [[ "$action" == 'deconfigure' ]]; then
+        REMOVE_PROGRAM=0
+        REMOVE_CONFIG=1
+      else
+        REMOVE_PROGRAM=1
+        REMOVE_CONFIG="$remove_deconfigure"
+      fi
+      orchestrator__remove_plan "${modules[@]}" || return 1
+      orchestrator__print_remove_plan
+      if [[ "$dry_run" -eq 1 ]]; then
+        return 0
+      fi
+      if [[ ${#REMOVE_BLOCKED[@]} -gt 0 ]]; then
+        return 1
+      fi
+      if [[ -z "$run_install" ]]; then
+        command__confirm || return 0
+      fi
+      orchestrator__remove_run
+      return $?
+      ;;
+  esac
 
   orchestrator__plan "${modules[@]}" || return 1
   lib__state_load
   orchestrator__prepare_dependency_sets
-
-  if [[ "$reset" -eq 1 && "$dry_run" -eq 0 ]]; then
-    orchestrator__reset
-    lib__log_success "State removed for ${#INSTALL_REQUESTED[@]} module(s)."
-    return 0
-  fi
-
-  if [[ "$reset" -eq 1 && "$dry_run" -eq 1 ]]; then
-    lib__log_warn '--reset is ignored in dry-run mode.'
-  fi
 
   orchestrator__print_plan
 

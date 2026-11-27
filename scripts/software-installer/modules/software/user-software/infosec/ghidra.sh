@@ -52,3 +52,15 @@ Categories=Development;Security;
 StartupNotify=true
 EOF
 }
+
+ghidra__is_installed() {
+  [[ -x /opt/ghidra/ghidraRun ]]
+}
+
+ghidra__remove() {
+  lib__as_root rm -rf /opt/ghidra
+}
+
+ghidra__deconfigure() {
+  lib__as_root rm -f /usr/local/bin/ghidra /usr/local/share/applications/ghidra.desktop
+}

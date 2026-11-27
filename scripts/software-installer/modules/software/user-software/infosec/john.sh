@@ -26,7 +26,7 @@ john__install() {
   local workdir
   local john_dir='/opt/john-the-ripper'
 
-  workdir="$(mktemp -d)"
+  workdir="$(lib__tmpdir)"
 
   (
     cd "$workdir"
@@ -42,8 +42,6 @@ john__install() {
   lib__as_root rm -rf "$john_dir"
   lib__as_root mkdir -p /opt
   lib__as_root cp -rf "$workdir/john/run" "$john_dir"
-
-  rm -rf "$workdir"
 }
 
 john__configure() {
@@ -62,4 +60,16 @@ EOF
   if [[ ! -f "$HOME/.zsh_custom" ]] || ! grep -q '/opt/john-the-ripper' "$HOME/.zsh_custom"; then
     echo "Please add $john_dir to PATH in your shell rc file."
   fi
+}
+
+john__is_installed() {
+  [[ -x /opt/john-the-ripper/john ]]
+}
+
+john__remove() {
+  lib__as_root rm -rf /opt/john-the-ripper
+}
+
+john__deconfigure() {
+  lib__as_root rm -f /usr/local/bin/john
 }

@@ -14,3 +14,15 @@ feh__install() {
 feh__configure() {
   return 0
 }
+
+feh__is_installed() {
+  lib__apt_is_installed feh
+}
+
+feh__remove() {
+  lib__apt_remove feh
+}
+
+feh__deconfigure() {
+  return 0
+}

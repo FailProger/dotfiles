@@ -13,3 +13,15 @@ polybar__install() {
 polybar__configure() {
   lib__cp_config 'polybar'
 }
+
+polybar__is_installed() {
+  lib__apt_is_installed polybar
+}
+
+polybar__remove() {
+  lib__apt_remove polybar
+}
+
+polybar__deconfigure() {
+  rm -rf "$HOME/.config/polybar"
+}

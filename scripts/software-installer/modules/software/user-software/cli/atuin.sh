@@ -18,3 +18,15 @@ atuin__install() {
 atuin__configure() {
   return 0
 }
+
+atuin__is_installed() {
+  command -v atuin > /dev/null 2>&1
+}
+
+atuin__remove() {
+  lib__as_root rm -f /usr/local/bin/atuin
+}
+
+atuin__deconfigure() {
+  return 0
+}

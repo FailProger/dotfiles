@@ -43,3 +43,16 @@ nvim__configure() {
   find "$config_dir" -type f ! -perm -u+x -exec chmod 600 {} +
   find "$config_dir" -type f -perm -u+x -exec chmod 700 {} +
 }
+
+nvim__is_installed() {
+  [[ -x /opt/nvim/bin/nvim ]]
+}
+
+nvim__remove() {
+  lib__as_root rm -rf /opt/nvim
+  lib__as_root rm -f /usr/local/bin/nvim
+}
+
+nvim__deconfigure() {
+  rm -rf "$HOME/.config/nvim"
+}

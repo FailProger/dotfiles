@@ -12,12 +12,9 @@ metasploit__get_runtime_dependencies() {
 }
 
 metasploit__install() {
-  if command -v msfconsole > /dev/null 2>&1; then
-    lib__log_info 'Metasploit is already installed, skipping.'
-    return 0
-  fi
+  local workdir
 
-  local workdir="$(mktemp -d)"
+  workdir="$(lib__tmpdir)"
 
   (
     cd "$workdir"
@@ -26,10 +23,21 @@ metasploit__install() {
     chmod 755 'msfupdate.erb'
     lib__as_root './msfupdate.erb'
   )
-
-  rm -rf "$workdir"
 }
 
 metasploit__configure() {
+  return 0
+}
+
+metasploit__is_installed() {
+  command -v msfconsole > /dev/null 2>&1
+}
+
+metasploit__remove() {
+  lib__as_root rm -rf /opt/metasploit-framework
+  lib__as_root rm -f /usr/local/bin/msfconsole /usr/local/bin/msfvenom /usr/local/bin/msfdb
+}
+
+metasploit__deconfigure() {
   return 0
 }

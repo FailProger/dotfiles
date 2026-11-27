@@ -21,3 +21,15 @@ User=$USER
 Session=i3
 EOF
 }
+
+sddm__is_installed() {
+  lib__apt_is_installed sddm
+}
+
+sddm__remove() {
+  lib__apt_remove sddm
+}
+
+sddm__deconfigure() {
+  lib__as_root rm -f /etc/sddm.conf.d/autologin.conf
+}

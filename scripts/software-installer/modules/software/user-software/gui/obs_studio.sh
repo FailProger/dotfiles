@@ -22,3 +22,15 @@ obs_studio__install() {
 obs_studio__configure() {
   return 0
 }
+
+obs_studio__is_installed() {
+  lib__apt_is_installed obs-studio
+}
+
+obs_studio__remove() {
+  lib__apt_remove obs-studio
+}
+
+obs_studio__deconfigure() {
+  return 0
+}

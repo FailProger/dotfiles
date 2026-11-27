@@ -13,3 +13,15 @@ tmux__install() {
 tmux__configure() {
   lib__cp_config 'tmux'
 }
+
+tmux__is_installed() {
+  lib__apt_is_installed tmux
+}
+
+tmux__remove() {
+  lib__apt_remove tmux
+}
+
+tmux__deconfigure() {
+  rm -rf "$HOME/.config/tmux"
+}

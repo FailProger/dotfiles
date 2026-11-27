@@ -25,3 +25,15 @@ happ__install() {
 happ__configure() {
   return 0
 }
+
+happ__is_installed() {
+  lib__apt_is_installed happ || lib__apt_is_installed happ-desktop
+}
+
+happ__remove() {
+  lib__apt_remove happ happ-desktop
+}
+
+happ__deconfigure() {
+  return 0
+}

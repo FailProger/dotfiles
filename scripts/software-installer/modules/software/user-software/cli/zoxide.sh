@@ -18,3 +18,15 @@ zoxide__install() {
 zoxide__configure() {
   return 0
 }
+
+zoxide__is_installed() {
+  command -v zoxide > /dev/null 2>&1
+}
+
+zoxide__remove() {
+  lib__as_root rm -f /usr/local/bin/zoxide
+}
+
+zoxide__deconfigure() {
+  return 0
+}

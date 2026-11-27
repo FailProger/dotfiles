@@ -1,3 +1,5 @@
+# --- PATCHES.H ---
+
 --- a/patches.h
 +++ b/patches.h
 @@ -29,7 +29,7 @@
@@ -88,7 +90,13 @@
  
  /* Draws a dot indicator overlayed on each tag icon for each client. The selected client
   * is drawn as a larger horizontal line.
-@@ -351,12 +351,12 @@
+@@ -346,17 +346,17 @@
+  * https://github.com/bakkeby/dwm-flexipatch/issues/50 (_IS_FLOATING patch)
+  * https://dwm.suckless.org/patches/ewmhtags/
+  */
+-#define BAR_EWMHTAGS_PATCH 0
++#define BAR_EWMHTAGS_PATCH 1
+ 
  /* Allows the bar height to be explicitly set rather than being derived from font.
   * https://dwm.suckless.org/patches/bar_height/
   */
@@ -173,7 +181,16 @@
  
  /* By default MOD+Tab will take the user back to the previous tag only. If the user keeps
   * using MOD+Tab then the view will switch back and forth between the current and previous tag.
-@@ -1580,7 +1580,7 @@
+@@ -1476,7 +1476,7 @@
+ #define WINDOWROLERULE_PATCH 0
+ 
+ /* Simple version of "windowmap" patch. Change XMoveWindow to XUnmapWindow for picom tracking. */
+-#define WINDOW_UNMAP_PATCH 0
++#define WINDOW_UNMAP_PATCH 1
+ 
+ /* The winview patch allows switching the view to that of a given client from the all-window
+  * view (Mod-0) using a keyboard shortcut.
+@@ -1583,7 +1583,7 @@
  /* Grid layout where nmaster controls the number of rows.
   * https://dwm.suckless.org/patches/nrowgrid/
   */
@@ -182,9 +199,13 @@
  
  /* The default tile layout.
   * This can be optionally disabled in favour of other layouts.
+
+
+# --- CONFIG.MK ---
+
 --- a/config.mk
 +++ b/config.mk
-@@ -29,7 +29,7 @@
+@@ -29,7 +29,7 @@ FREETYPEINC = /usr/include/freetype2
  #KVMLIB = -lkvm
  
  # Uncomment this for the alpha patch and the winicon patch (BAR_ALPHA_PATCH, BAR_WINICON_PATCH)
@@ -193,7 +214,7 @@
  
  # Uncomment this for the mdpcontrol patch / MDPCONTROL_PATCH
  #MPDCLIENT = -lmpdclient
-@@ -49,10 +49,10 @@
+@@ -49,10 +49,10 @@ FREETYPEINC = /usr/include/freetype2
  #XCBLIBS = -lX11-xcb -lxcb -lxcb-res
  
  # This is needed for the winicon and tagpreview patches / BAR_WINICON_PATCH / BAR_TAGPREVIEW_PATCH

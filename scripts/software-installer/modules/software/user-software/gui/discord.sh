@@ -22,3 +22,15 @@ discord__install() {
 discord__configure() {
   return 0
 }
+
+discord__is_installed() {
+  lib__apt_is_installed discord
+}
+
+discord__remove() {
+  lib__apt_remove discord
+}
+
+discord__deconfigure() {
+  return 0
+}

@@ -27,3 +27,15 @@ feroxbuster__install() {
 feroxbuster__configure() {
   return 0
 }
+
+feroxbuster__is_installed() {
+  lib__apt_is_installed feroxbuster
+}
+
+feroxbuster__remove() {
+  lib__apt_remove feroxbuster
+}
+
+feroxbuster__deconfigure() {
+  return 0
+}
