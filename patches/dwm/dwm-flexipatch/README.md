@@ -1,4 +1,4 @@
-dwm Installation
+dwm installation
 ================
 
 ## Warning
