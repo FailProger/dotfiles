@@ -3,13 +3,13 @@ dotfiles
 
 ## About
 
-It is repo with my dotfiles for all programms that I ever use, and maybe now I do not use anything by them.
+It is repo with my dotfiles for all programs that I ever use, and maybe now I do not use anything by them.
 
 **Directories:**
  - *config* - `.config` directory from user home.
  - *local* - `.local` directory from user home.
- - *scripts* - directory with programms installation scripts and other utils (in furute).
- - *suckless* - directory with `config.h` files for building `dwm` (and it fork like `dwm-flexipatch`) and other programms need for normal desktop environment.
+ - *scripts* - directory with programs installation scripts and other utils (in furute).
+ - *parches* - directory with my custom patches and other files need to build programs. 
 
 ## Warning
 
